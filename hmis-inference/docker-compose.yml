@@ -1,0 +1,109 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: timescale/timescaledb:latest-pg16
+    container_name: hmis-postgres
+    environment:
+      POSTGRES_DB: hmis
+      POSTGRES_USER: hmis
+      POSTGRES_PASSWORD: hmis_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hmis -d hmis"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: >
+      postgres
+      -c shared_preload_libraries=timescaledb
+
+  redis:
+    image: redis:7
+    container_name: hmis-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hmis-backend
+    command: ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      DATABASE_URL: postgresql://hmis:hmis_password@postgres:5432/hmis
+      REDIS_URL: redis://redis:6379/0
+      PYTHONPATH: /app
+      CHROMA_PATH: /app/chroma_db
+      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-llama-3.3-70b-versatile}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-mistral}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5173}
+      API_KEY: ${API_KEY:-}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./chroma_db:/app/chroma_db
+      # Bind-mount the RAG corpus so adding new PDFs doesn't need a rebuild.
+      - ./backend/data/policy_docs:/app/backend/data/policy_docs
+    restart: unless-stopped
+
+  celery-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hmis-celery-worker
+    # NOTE: previously this invoked `source backend/venv/bin/activate`, but
+    # the Dockerfile installs deps globally with pip — that venv never exists.
+    command: ["celery", "-A", "backend.tasks", "worker", "--loglevel=info", "--concurrency=2"]
+    environment:
+      DATABASE_URL: postgresql://hmis:hmis_password@postgres:5432/hmis
+      REDIS_URL: redis://redis:6379/0
+      PYTHONPATH: /app
+      CHROMA_PATH: /app/chroma_db
+      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-llama-3.3-70b-versatile}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-mistral}
+    depends_on:
+      backend:
+        condition: service_started
+    volumes:
+      - ./chroma_db:/app/chroma_db
+    restart: unless-stopped
+
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hmis-celery-beat
+    command: ["celery", "-A", "backend.tasks", "beat", "--loglevel=info"]
+    environment:
+      DATABASE_URL: postgresql://hmis:hmis_password@postgres:5432/hmis
+      REDIS_URL: redis://redis:6379/0
+      PYTHONPATH: /app
+    depends_on:
+      backend:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
