@@ -43,13 +43,15 @@ class TestDiseaseForecaster:
 
     def test_forecast_horizon_default_is_seven(self):
         out = self.f.forecast_7day()
-        # future dataframe extends history + horizon, so total days = N + 7
-        assert isinstance(out, pd.DataFrame)
-        assert len(out) == len(self.df) + 7
+        # Production contract: list[dict] of horizon rows only (the router
+        # serialises these directly into the ForecastResponse).
+        assert isinstance(out, list)
+        assert len(out) == 7
 
     def test_forecast_horizon_custom(self):
         out = self.f.forecast_7day(horizon_days=14)
-        assert len(out) == len(self.df) + 14
+        assert isinstance(out, list)
+        assert len(out) == 14
 
     def test_unfitted_raises_runtime(self):
         f = DiseaseForecaster()
@@ -57,15 +59,17 @@ class TestDiseaseForecaster:
             f.forecast_7day()
 
     def test_forecast_contains_required_columns(self):
-        """Prophet output must contain the canonical columns the API serialises."""
+        """Each forecast row must carry the canonical serialised payload."""
         out = self.f.forecast_7day()
-        for col in ("ds", "yhat", "yhat_lower", "yhat_upper"):
-            assert col in out.columns, f"Missing column in forecast: {col}"
+        assert out, "Forecast should produce rows"
+        for row in out:
+            for key in ("ds", "yhat", "yhat_lower", "yhat_upper"):
+                assert key in row, f"Missing key in forecast row: {key}"
 
     def test_forecast_dates_are_progressive(self):
-        """Forecast ds must be sorted ascending."""
+        """Forecast ds must be sorted ascending across rows."""
         out = self.f.forecast_7day()
-        ds = pd.to_datetime(out["ds"])
+        ds = pd.to_datetime([r["ds"] for r in out])
         assert ds.is_monotonic_increasing
 
     def test_forecast_respects_interval_width(self):
@@ -74,12 +78,11 @@ class TestDiseaseForecaster:
         f_tight = DiseaseForecaster(interval_width=0.50).fit(self.df, "dengue")
         loose = f_loose.forecast_7day()
         tight = f_tight.forecast_7day()
-        # Look at the last row — the day furthest from the data end.
         last = -1
-        loose_span = loose.loc[last, "yhat_upper"] - loose.loc[last, "yhat_lower"]
-        tight_span = tight.loc[last, "yhat_upper"] - tight.loc[last, "yhat_lower"]
+        loose_span = loose[last]["yhat_upper"] - loose[last]["yhat_lower"]
+        tight_span = tight[last]["yhat_upper"] - tight[last]["yhat_lower"]
         # 95% should give a wider band than 50%, modulo Prophet noise floor.
-        assert loose_span >= tight_span - 5.0  # small tolerance
+        assert loose_span >= tight_span - 5.0
 
     def test_forecast_handles_short_series(self):
         """Prophet can technically fit down to ~2 points; verify the model
@@ -88,4 +91,5 @@ class TestDiseaseForecaster:
         f = DiseaseForecaster(weekly_seasonality=False, yearly_seasonality=False)
         f.fit(short_df, "dengue")
         out = f.forecast_7day(horizon_days=3)
-        assert len(out) == 5  # 2 + 3
+        assert isinstance(out, list)
+        assert len(out) == 3

@@ -27,7 +27,7 @@ function RiskScore({ score }: { score: number }) {
      </div>
       <div className="min-w-0">
         <span className="text-caption text-muted-foreground block">Risk Score</span>
-        <span className={cn('text-body-sm font-semibold', color)}>{label</span>
+        <span className={cn('text-body-sm font-semibold', color)}>{label}</span>
      </div>
    </div>
   )
@@ -63,10 +63,10 @@ function FilteredOutState({ alert, onClearFilter }: { alert: any; onClearFilter?
       <h3 className="text-body-sm font-semibold text-foreground mb-1">Alert filtered out</h3>
       <p className="text-caption text-muted-foreground mb-4 max-w-[280px] leading-relaxed">
         You selected{' '}
-        <span className="font-semibold text-foreground/80">{alert.facility_name || 'this alert'</span>
+        <span className="font-semibold text-foreground/80">{alert.facility_name || 'this alert'}</span>
         {alert.district_name && (
           <>
-            {' '}in <span className="font-semibold text-foreground/80">{alert.district_name</span>
+            {' '}in <span className="font-semibold text-foreground/80">{alert.district_name}</span>
           </>
         )}
         , but the current filter hides it. Clear the filter to view the full investigation.
@@ -128,7 +128,7 @@ export function AlertDetail({ alert, isFilteredOut, onClearFilter }: AlertDetail
             {alert.severity}
          </span>
           {alert.inference_type && (
-            <span className="text-caption text-muted-foreground">{alert.inference_type</span>
+            <span className="text-caption text-muted-foreground">{alert.inference_type}</span>
           )}
           {alert.created_at && (
             <>
@@ -140,7 +140,7 @@ export function AlertDetail({ alert, isFilteredOut, onClearFilter }: AlertDetail
         <h2 className="text-heading-sm font-semibold text-foreground tracking-tight">
           {alert.facility_name || 'Unknown Facility'}
        </h2>
-        <p className="text-caption text-muted-foreground mt-0.5">{alert.district_name</p>
+        <p className="text-caption text-muted-foreground mt-0.5">{alert.district_name}</p>
      </div>
 
       {/* Content */}
@@ -155,14 +155,14 @@ export function AlertDetail({ alert, isFilteredOut, onClearFilter }: AlertDetail
         {alert.why_it_happening && (
           <section>
             <h3 className="text-body-sm font-semibold text-foreground mb-1.5">Root Cause</h3>
-            <p className="text-body text-foreground/80 leading-relaxed">{alert.why_it_happening</p>
+            <p className="text-body text-foreground/80 leading-relaxed">{alert.why_it_happening}</p>
          </section>
         )}
 
         {alert.recommended_action && (
           <section className="px-3 py-2.5 rounded-lg bg-info/8 border border-info/20">
             <h3 className="text-caption font-semibold text-info mb-1 uppercase tracking-wider">Recommended Action</h3>
-            <p className="text-body text-foreground/80 leading-relaxed">{alert.recommended_action</p>
+            <p className="text-body text-foreground/80 leading-relaxed">{alert.recommended_action}</p>
          </section>
         )}
 

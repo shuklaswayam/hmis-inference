@@ -5,6 +5,8 @@ Heavy inference work touched by the nightly task is the integrated end-to-end
 path covered by the live integration suite; these tests pin down the contract
 the worker needs to honour without spinning up Postgres + Redis.
 """
+import inspect
+
 import pytest
 
 from backend.tasks import app, run_nightly_inference
@@ -40,14 +42,33 @@ class TestCeleryConfig:
         assert "nightly-inference" in app.conf.beat_schedule
         sched = app.conf.beat_schedule["nightly-inference"]
         assert sched["task"] == "tasks.run_nightly_inference"
-        # 00:30 IST via crontab(hour=0, minute=30)
-        assert sched["schedule"].hour == 0
-        assert sched["schedule"].minute == 30
+        # Celery's ``crontab`` exposes hour/minute as ``set`` containers (so
+        # multiple slots can be configured); the schedule is "00:30 daily".
+        assert 0 in sched["schedule"].hour, sched["schedule"].hour
+        assert 30 in sched["schedule"].minute, sched["schedule"].minute
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Task registration — run_nightly_inference must be registered with Celery
 # ─────────────────────────────────────────────────────────────────────────────
+def _is_bound_task(task) -> bool:
+    """Celery 5 stored ``bind=True`` is observable via the task's *callable*
+    accepting a leading ``self`` parameter — inspect.signature of the
+    underlying function after unwrapping ``functools.wraps`` reveals it."""
+    fn = task.run
+    for _ in range(10):  # bounded unwrap to avoid infinite chain loops
+        if not hasattr(fn, "__wrapped__"):
+            break
+        fn = fn.__wrapped__
+    fn = fn.__func__ if hasattr(fn, "__func__") else fn
+    try:
+        sig = inspect.signature(fn)
+    except (TypeError, ValueError):
+        return False
+    params = list(sig.parameters)
+    return bool(params) and params[0] == "self"
+
+
 class TestTaskRegistration:
     def test_nightly_task_registered(self):
         assert "tasks.run_nightly_inference" in app.tasks
@@ -55,7 +76,11 @@ class TestTaskRegistration:
     def test_nightly_task_is_bound(self):
         """bind=True gives access to self.retry on failure — verify the
         decorator is intact after any refactor."""
-        assert run_nightly_inference.bind is True
+        task = app.tasks["tasks.run_nightly_inference"]
+        assert _is_bound_task(task), (
+            "run_nightly_inference must accept a leading 'self' so self.retry "
+            "is reachable; the @app.task(bind=True) decorator is missing."
+        )
 
     def test_nightly_task_max_retries(self):
         """Up to 3 retries — anything less and a single DB hiccup drops a day."""

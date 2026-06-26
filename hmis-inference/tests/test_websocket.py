@@ -25,20 +25,26 @@ def test_websocket_route_is_registered_on_app():
 
 
 def test_websocket_route_is_websocket_upgrade():
-    """Sanity: the registered route actually accepts the WebSocket protocol."""
+    """Sanity: the registered route actually accepts the WebSocket protocol.
+
+    FastAPI exposes WebSocket routes as ``APIWebSocketRoute`` instances —
+    they carry a ``path`` and ``path_format`` but **no** ``methods`` attribute
+    (HTTP-only routes are the ones that record methods).  So detect by class
+    name + path, not by ``route.methods``.
+    """
+    from fastapi.routing import APIWebSocketRoute
+
     from backend.main import app
 
     ws_routes = [
         route for route in app.routes
-        if hasattr(route, "path")
-        and route.path == "/ws/alerts"
-        and "websocket" in getattr(route, "path_format", "")
-        or any("websocket" in str(r).lower() for r in route.methods if hasattr(route, "methods"))
-        if hasattr(route, "methods")
+        if isinstance(route, APIWebSocketRoute) and route.path == "/ws/alerts"
     ]
-    # At minimum there must be a route; protocol-handshake assertion is on
-    # the TestClient behaviour below.
-    assert ws_routes
+    assert ws_routes, "Expected at least one APIWebSocketRoute at /ws/alerts"
+    # Path-format and class sanity so a future refactor that swaps the WS
+    # implementation for an HTTP-route gets a clear failure.
+    assert ws_routes[0].path == "/ws/alerts"
+    assert ws_routes[0].path_format == ws_routes[0].path
 
 
 @patch("backend.routers.websocket.aioredis")

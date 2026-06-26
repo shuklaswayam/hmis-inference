@@ -100,7 +100,13 @@ def make_facility_metrics_create(make_facility_create):
 # ─────────────────────────────────────────────────────────────────────────────
 @pytest.fixture
 def mock_db():
-    """Patch backend.database.Database to return canned async mocks."""
+    """Patch backend.database.Database to return canned async mocks.
+
+    Each test gets a fresh MagicMock; tests that reassign ``mock_db.fetch``
+    (or any sibling) replace only that attribute, leaving the rest intact.
+    A fresh return_value per attribute ensures cross-test contamination from
+    leftover ``side_effect`` iterables is impossible.
+    """
     db = MagicMock()
     db.initialize = AsyncMock()
     db.close = AsyncMock()
@@ -126,11 +132,34 @@ def mock_redis():
 # ─────────────────────────────────────────────────────────────────────────────
 @pytest.fixture
 def fastapi_client(mock_db, mock_redis):
+    """Build a TestClient with backend.database.Database patched at the source.
+
+    Each router does ``from backend.database import Database`` — that captures
+    the *class* object as a local binding at import time, so patching only
+    ``backend.database.Database`` is silently bypassed by the routers. We
+    patch the symbol on every router module that imports it, plus the source
+    module + backend.main, so every call site sees the mock.
+    """
+    from contextlib import ExitStack
     from unittest.mock import patch
 
-    with patch("backend.main.Database", mock_db):
-        with patch("backend.routers.alerts.redis_client", mock_redis):
-            with patch("backend.routers.qa.redis_client", mock_redis):
-                from fastapi.testclient import TestClient
-                from backend.main import app
-                yield TestClient(app)
+    router_modules = (
+        "backend.main",
+        "backend.database",
+        "backend.routers.alerts",
+        "backend.routers.districts",
+        "backend.routers.facilities",
+        "backend.routers.forecast",
+        "backend.routers.ingest",
+        "backend.routers.insights",
+        "backend.routers.metrics",
+        "backend.routers.qa",
+    )
+    with ExitStack() as stack:
+        for module in router_modules:
+            stack.enter_context(patch(f"{module}.Database", mock_db))
+        stack.enter_context(patch("backend.routers.alerts.redis_client", mock_redis))
+        stack.enter_context(patch("backend.routers.qa.redis_client", mock_redis))
+        from fastapi.testclient import TestClient
+        from backend.main import app
+        yield TestClient(app)

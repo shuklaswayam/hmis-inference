@@ -26,10 +26,8 @@ def test_alerts_get_returns_list(mock_redis_cls, mock_db, fastapi_client):
     mock_redis_cls.get = AsyncMock(return_value=None)
     mock_redis_cls.setex = AsyncMock(return_value=True)
 
-    # _run_rules_engine_on_facilities fetches latest metrics
+    # Both DB-fetching helpers default to ``[]`` (no facilities, no active alerts).
     mock_db.fetch.return_value = []
-    # _fetch_active_alerts also fetches
-    mock_db.fetch.side_effect = [[], []]
 
     resp = fastapi_client.get("/api/v1/alerts/")
     assert resp.status_code == 200
@@ -41,7 +39,7 @@ def test_alerts_with_filter_params_routes_correctly(mock_redis, mock_db, fastapi
     """Query string filters pass through and don't error."""
     mock_redis.get = AsyncMock(return_value=None)
     mock_redis.setex = AsyncMock(return_value=True)
-    mock_db.fetch.side_effect = [[], []]
+    mock_db.fetch.return_value = []
 
     resp = fastapi_client.get(
         "/api/v1/alerts/",
@@ -95,12 +93,19 @@ def test_facilities_list(mock_db, fastapi_client):
 
 
 def test_facilities_summary_shape(mock_db, fastapi_client):
-    # Two queries are issued in this endpoint.
-    mock_db.fetchrow = AsyncMock(side_effect=[
+    # Two queries are issued in this endpoint; wrap the AsyncMock so each
+    # successive call pops from a queue. AsyncMock + side_effect list alone
+    # raises ``StopAsyncIteration`` when exhausted, breaking the second call.
+    queue = [
         {"total": 12, "districts": 5, "total_beds": 1000, "total_icu_beds": 100},
         {"avg_bed_occ": 70.0, "avg_icu_occ": 60.0,
          "total_opd": 50_000, "total_emergency": 5_000},
-    ])
+    ]
+
+    async def _serve(*_args, **_kwargs):
+        return queue.pop(0)
+
+    mock_db.fetchrow.side_effect = _serve
     resp = fastapi_client.get("/api/v1/facilities/summary")
     assert resp.status_code == 200
     data = resp.json()
@@ -141,16 +146,22 @@ def test_ingest_district_requires_name(mock_db, fastapi_client):
 
 @patch("backend.routers.ingest.Database")
 def test_ingest_district_success(mock_db_cls, mock_db, fastapi_client):
+    """The ingest router raises 400 when ``zone`` is missing for INSERT, so
+    the test fixture must include a non-None ``zone`` value — and the row's
+    ``created_at`` must be returned in ``isoformat``-compatible form."""
     created_row = {
         "id": "d-new", "name": "Anand", "state": "Gujarat",
-        "population": 2_000_000, "zone": None,
+        "population": 2_000_000, "zone": "Central",
         "created_at": __import__("datetime").datetime(2026, 6, 24),
     }
-    mock_db.fetchrow = AsyncMock(return_value=created_row)
+    # The local @patch replaces backend.routers.ingest.Database with a fresh
+    # MagicMock, so configure that one — not the conftest ``mock_db``.
+    mock_db_cls.fetchrow = AsyncMock(return_value=created_row)
 
     resp = fastapi_client.post(
         "/api/v1/ingest/district",
-        json={"name": "Anand", "state": "Gujarat", "population": 2_000_000},
+        json={"name": "Anand", "state": "Gujarat", "population": 2_000_000,
+              "zone": "Central"},
     )
     assert resp.status_code == 201
     assert resp.json()["name"] == "Anand"
@@ -218,7 +229,10 @@ def test_websocket_route_registered(fastapi_client):
 # ─────────────────────────────────────────────────────────────────────────────
 def test_all_routers_present_in_app(fastapi_client):
     """Sanity check that none of the nine routers has been forgotten in
-    include_router(). Easy to drift on."""
+    include_router(). Each registered route's ``path`` already has the router
+    prefix concatenated, so the test scans the actual routes for at least one
+    path beginning with each expected prefix and asserts no prefix goes
+    unrepresented."""
     expected_prefixes = {
         "/api/v1/alerts",
         "/api/v1/districts",
@@ -229,12 +243,17 @@ def test_all_routers_present_in_app(fastapi_client):
         "/api/v1/metrics",
         "/api/v1/ask",  # qa router
     }
-    actual_prefixes = {
+    api_paths = [
         route.path
         for route in fastapi_client.app.routes
         if hasattr(route, "path") and route.path.startswith("/api/v1")
+    ]
+    missing = {
+        prefix
+        for prefix in expected_prefixes
+        if not any(p == prefix or p.startswith(prefix + "/") or p == prefix.rstrip("/")
+                   for p in api_paths)
     }
-    missing = expected_prefixes - actual_prefixes
     assert not missing, f"Missing router prefixes in app: {missing}"
 
 

@@ -8,8 +8,25 @@ from fastapi.testclient import TestClient
 
 
 def _make_client():
-    """Build a TestClient with database mocked out."""
-    with patch("backend.main.Database"):
+    """Build a TestClient with database + redis mocked out.
+
+    Mirrors tests/conftest.py::fastapi_client — patch every router module
+    that imports ``Database`` or ``redis_client`` because ``from backend.X
+    import Y`` captures the symbol at import time and won't reflect a
+    single-module patch.
+    """
+    from contextlib import ExitStack
+
+    with ExitStack() as stack:
+        for module in (
+            "backend.main",
+            "backend.database",
+            "backend.routers.alerts",
+            "backend.routers.qa",
+        ):
+            stack.enter_context(patch(f"{module}.Database"))
+        stack.enter_context(patch("backend.routers.alerts.redis_client"))
+        stack.enter_context(patch("backend.routers.qa.redis_client"))
         from backend.main import app
         return TestClient(app)
 
@@ -87,9 +104,11 @@ def test_ask_no_district(mock_rag, mock_llm, mock_redis):
 
 
 @patch("backend.routers.qa.redis_client")
+@patch("backend.routers.qa.Database")
 @patch("backend.routers.qa.llm")
 @patch("backend.routers.qa.rag")
-def test_ask_irrelevant_query(mock_rag, mock_llm, mock_redis):
+def test_ask_irrelevant_query(mock_rag, mock_llm, mock_db_qa, mock_redis):
+    """Out-of-corpus question — RAG returns nothing, no DB analytics needed."""
     mock_rag.retrieve.return_value = []
     mock_llm.synthesize.return_value = {
         "what_is_happening": "I don't have relevant health policy data to answer this question.",
@@ -98,6 +117,10 @@ def test_ask_irrelevant_query(mock_rag, mock_llm, mock_redis):
     }
     mock_redis.get.return_value = None
     mock_redis.setex = MagicMock()
+    # The ask endpoint calls _fetch_recent_alerts() unconditionally — mock it
+    # out so the test doesn't fall through to a real Postgres call (the
+    # previous decorator-based mock set only papered over llm/rag/redis).
+    mock_db_qa.fetch = AsyncMock(return_value=[])
 
     client = _make_client()
     response = client.post(
