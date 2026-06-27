@@ -17,6 +17,14 @@ You are a public health analytics assistant for India's HMIS. \
 You MUST base your analysis ONLY on the facility data, recent alerts (if any
 are present in the input), and policy documents provided. \
 Do NOT invent statistics, drug names, or guidelines not present in the input. \
+When a *trajectory* (a sequence of daily values over time) is provided, \
+REPORT THE TREND: cite the earliest and latest values, the direction of \
+movement (climbing / falling / stable), and approximate magnitude. \
+When a *forecast* (a Prophet projection of future values) is provided, \
+anchor any forward-looking recommendations to it. \
+When *z-scores* or *anomaly scores* are provided, treat them as the \
+statistical significance of current readings and reference them when \
+justifying a HIGH vs MEDIUM vs LOW recommendation. \
 If the data is insufficient, say so explicitly. \
 When asked about recent incidents, new events, or which facilities are flagged, \
 refer to the recent_alerts entries by facility name and severity level. \
@@ -163,17 +171,34 @@ class LLMSynthesizer:
     def synthesize(
         self, context: dict[str, Any], rag_chunks: list[str]
     ) -> dict[str, Any]:
-        context_str = json.dumps(context, default=str)
-        if len(context_str) > 2000:
-            context_str = context_str[:2000] + "..."
+        # Build the prompt with named sections. The previous implementation
+        # json.dumps'd the entire context and sliced at 2000 chars, which
+        # routinely truncated mid-JSON mid-alert-list — the LLM would then
+        # confabulate against a half-cut snapshot of the database.
+        #
+        # Groq's llama-3.3-70b has a 128k context window, so we no longer
+        # need to truncate. We just trim the chunk list to the top 5 most
+        # relevant (the retriever already enforces the distance gate) and
+        # pass everything through verbatim.
+        #
+        # ``rag_chunks`` may be either bare strings (legacy chunk format)
+        # or ``RetrievedChunk`` objects with a ``text`` attribute (current
+        # retriever contract). Normalise to strings here so the join
+        # below never blows up.
+        def _coerce(chunk: Any) -> str:
+            if isinstance(chunk, str):
+                return chunk
+            return getattr(chunk, "text", str(chunk))
 
-        chunks_text = "\n".join(rag_chunks[:3]) if rag_chunks else "(none found)"
+        chunks_text = "\n".join(_coerce(c) for c in rag_chunks[:5]) if rag_chunks else "(none found)"
 
         prompt = (
-            f"FACILITY DATA:\n{context_str}\n"
-            f"\nRELEVANT POLICIES:\n{chunks_text}\n"
-            f"\nGenerate analysis in JSON format with keys: "
-            f"what_is_happening, why_it_happening, recommended_action"
+            f"QUESTION:\n{context.get('question', '')}\n\n"
+            f"FACILITY DATA (structured database rows from HMIS):\n"
+            f"{json.dumps(context, default=str, indent=2)}\n\n"
+            f"RELEVANT POLICY DOCUMENT EXCERPTS:\n{chunks_text}\n\n"
+            f"Generate analysis in JSON format with exactly these three keys:\n"
+            f'"what_is_happening", "why_it_happening", "recommended_action".'
         )
 
         if self._provider == "groq":

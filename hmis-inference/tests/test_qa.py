@@ -36,14 +36,49 @@ def _cache_key(query: str, district_id: str | None) -> str:
     return f"qa:{hashlib.sha256(raw.encode()).hexdigest()}"
 
 
+class _FakeChunk:
+    """Stand-in for backend.rag.retriever.RetrievedChunk with text + source + prefix."""
+
+    def __init__(self, source: str, prefix: str, distance: float = 0.5):
+        self.source = source
+        self.prefix = prefix
+        self.distance = distance
+
+
+def _attach_rag_returns(mock_rag, chunks):
+    """Wire mock RAG to return ``chunks`` and supply a sane mean distance."""
+    mock_rag.retrieve.return_value = chunks
+    # mean_distance is consumed by ``_confidence_from_chunks`` (qa.py:325)
+    # and by the no-answer fallback gate (qa.py:442). Returning a finite
+    # number keeps the test on the "happy path" or refusal path depending
+    # on what's needed.
+    mock_rag.mean_distance.return_value = (
+        sum(c.distance for c in chunks) / len(chunks) if chunks else 0.0
+    )
+    # NO_ANSWER_AVG_DISTANCE is consulted alongside mean_distance. The
+    # default in retriever.py is 1.2; any chunks with distance < 1.2
+    # land in the happy path. Mock it explicitly so the tests are
+    # independent of constant tuning in the source.
+    from backend.rag import retriever as _ret
+    mock_rag.NO_ANSWER_AVG_DISTANCE = getattr(
+        _ret, "NO_ANSWER_AVG_DISTANCE", 1.2
+    )
+
+
 @patch("backend.routers.qa.Database")
 @patch("backend.routers.qa.redis_client")
 @patch("backend.routers.qa.llm")
 @patch("backend.routers.qa.rag")
 def test_ask_success(mock_rag, mock_llm, mock_redis, mock_db):
-    mock_rag.retrieve.return_value = [
-        "[dengue_guidelines.pdf]: Dengue outbreak response requires rapid response teams.",
-    ]
+    _attach_rag_returns(
+        mock_rag,
+        [
+            _FakeChunk(
+                source="dengue_guidelines.pdf",
+                prefix="[dengue_guidelines.pdf]: Dengue outbreak response requires rapid response teams.",
+            )
+        ],
+    )
     mock_llm.synthesize.return_value = {
         "what_is_happening": "High OPD visits suggest seasonal surge.",
         "why_it_happening": "Monsoon season increases vector-borne diseases.",
@@ -78,9 +113,15 @@ def test_ask_success(mock_rag, mock_llm, mock_redis, mock_db):
 @patch("backend.routers.qa.llm")
 @patch("backend.routers.qa.rag")
 def test_ask_no_district(mock_rag, mock_llm, mock_redis):
-    mock_rag.retrieve.return_value = [
-        "[dengue_guidelines.pdf]: Dengue guidelines for diagnosis and treatment.",
-    ]
+    _attach_rag_returns(
+        mock_rag,
+        [
+            _FakeChunk(
+                source="dengue_guidelines.pdf",
+                prefix="[dengue_guidelines.pdf]: Dengue guidelines for diagnosis and treatment.",
+            )
+        ],
+    )
     mock_llm.synthesize.return_value = {
         "what_is_happening": "Dengue guidelines cover diagnosis, treatment, and prevention.",
         "why_it_happening": "WHO recommends early detection.",
@@ -108,19 +149,12 @@ def test_ask_no_district(mock_rag, mock_llm, mock_redis):
 @patch("backend.routers.qa.llm")
 @patch("backend.routers.qa.rag")
 def test_ask_irrelevant_query(mock_rag, mock_llm, mock_db_qa, mock_redis):
-    """Out-of-corpus question — RAG returns nothing, no DB analytics needed."""
-    mock_rag.retrieve.return_value = []
-    mock_llm.synthesize.return_value = {
-        "what_is_happening": "I don't have relevant health policy data to answer this question.",
-        "why_it_happening": "The policy documents only cover Indian public health topics.",
-        "recommended_action": "Please ask about dengue, malaria, maternal health, or immunization.",
-    }
+    """Out-of-corpus question — RAG returns empty so the endpoint short-circuits
+    to its refusal branch (lines 432–447 of qa.py) without ever calling the LLM."""
+    _attach_rag_returns(mock_rag, [])  # empty retrieval → no-answer path
+
     mock_redis.get.return_value = None
     mock_redis.setex = MagicMock()
-    # The ask endpoint calls _fetch_recent_alerts() unconditionally — mock it
-    # out so the test doesn't fall through to a real Postgres call (the
-    # previous decorator-based mock set only papered over llm/rag/redis).
-    mock_db_qa.fetch = AsyncMock(return_value=[])
 
     client = _make_client()
     response = client.post(
@@ -131,7 +165,10 @@ def test_ask_irrelevant_query(mock_rag, mock_llm, mock_db_qa, mock_redis):
     assert response.status_code == 200
     data = response.json()
     assert data["question"] == "What is the capital of France?"
-    assert "I don't have relevant health policy data" in data["answer"]
+    # The new refusal text (qa.py lines 433–438) — the LLM is not invoked.
+    assert "I don't have enough information" in data["answer"]
+    assert data["refused"] is True
+    assert data["confidence"] == "low"
 
 
 @patch("backend.routers.qa.redis_client")

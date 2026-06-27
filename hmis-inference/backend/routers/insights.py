@@ -74,6 +74,111 @@ async def _fetch_latest_metrics(facility_id: UUID) -> dict:
     return dict(row)
 
 
+async def _fetch_trajectory(facility_id: UUID, days: int = 14) -> dict:
+    """Fetch last N days of facility_metrics as parallel time-series lists.
+
+    Returned dict shape (each list aligns by index, one entry per day):
+        {"dates":          ["2026-06-13", ...],
+         "icu_pct":        [83.0, ...],
+         "bed_pct":        [78.5, ...],
+         "opd_visits":     [310, ...],
+         "emergency_visits":[50,  ...]}
+
+    The LLM gets these verbatim so it can reason about trends, not just
+    single-point snapshots.
+    """
+    rows = await Database.fetch(
+        """
+        SELECT
+            reported_date,
+            icu_occupancy_pct,
+            bed_occupancy_pct,
+            opd_visits,
+            emergency_visits
+        FROM facility_metrics
+        WHERE facility_id = $1
+          AND reported_date >= CURRENT_DATE - INTERVAL '%s days'
+        ORDER BY reported_date ASC
+        """ % days,
+        facility_id,
+    )
+    out = {
+        "dates":           [],
+        "icu_pct":         [],
+        "bed_pct":         [],
+        "opd_visits":      [],
+        "emergency_visits":[],
+    }
+    for r in rows:
+        d = dict(r)
+        out["dates"].append(d["reported_date"].isoformat())
+        out["icu_pct"].append(float(d["icu_occupancy_pct"]) if d["icu_occupancy_pct"] is not None else None)
+        out["bed_pct"].append(float(d["bed_occupancy_pct"]) if d["bed_occupancy_pct"] is not None else None)
+        out["opd_visits"].append(int(d["opd_visits"]) if d["opd_visits"] is not None else None)
+        out["emergency_visits"].append(int(d["emergency_visits"]) if d["emergency_visits"] is not None else None)
+    return out
+
+
+def _summarize_trajectory(traj: dict) -> dict:
+    """Compute per-metric summary stats over the trajectory window.
+
+    ``len(window)`` covers the latest reading; ``earliest`` and ``latest``
+    come from the first and last non-None values in each series. The
+    z-score column is computed against the 30-day window of values that
+    appear in the trajectory itself (so the LLM can see the spread).
+    """
+    import numpy as np
+    summary = {}
+    for key in ("icu_pct", "bed_pct", "opd_visits", "emergency_visits"):
+        series = [v for v in traj.get(key, []) if v is not None]
+        if len(series) < 2:
+            summary[key] = {}
+            continue
+        delta = round(series[-1] - series[0], 2)
+        direction = "climbing" if delta > 1 else ("falling" if delta < -1 else "stable")
+        summary[key] = {
+            "earliest":  round(series[0], 2),
+            "latest":    round(series[-1], 2),
+            "delta":     delta,
+            "direction": direction,
+            "mean":      round(float(np.mean(series)), 2),
+            "std":       round(float(np.std(series, ddof=1)) if len(series) > 1 else 0.0, 2),
+            "n_days":    len(series),
+        }
+        if summary[key]["std"]:
+            summary[key]["z_score_latest"] = round(
+                (series[-1] - summary[key]["mean"]) / summary[key]["std"], 2
+            )
+    return summary
+
+
+async def _fetch_recent_alerts_for_facility(facility_id: UUID, limit: int = 5) -> list[dict]:
+    """Fetch the latest inference_results rows for a facility — gives the LLM
+    the operational history so it can correlate the current reading with
+    what has been flagged recently."""
+    rows = await Database.fetch(
+        """
+        SELECT severity, inference_type, what_is_happening, recommended_action, created_at
+        FROM inference_results
+        WHERE facility_id = $1
+        ORDER BY created_at DESC
+        LIMIT %d
+        """ % limit,
+        facility_id,
+    )
+    out = []
+    for r in rows:
+        d = dict(r)
+        out.append({
+            "severity":            d.get("severity"),
+            "inference_type":      d.get("inference_type"),
+            "what_is_happening":   d.get("what_is_happening"),
+            "recommended_action":  d.get("recommended_action"),
+            "created_at":          d["created_at"].isoformat() if d.get("created_at") else None,
+        })
+    return out
+
+
 async def _fetch_historical_metrics(facility_id: UUID, days: int = 30) -> pd.DataFrame:
     """Fetch last N days of facility_metrics for Z-score computation."""
     rows = await Database.fetch(
@@ -99,14 +204,20 @@ async def _fetch_historical_metrics(facility_id: UUID, days: int = 30) -> pd.Dat
 
 
 async def _fetch_top_disease(district_id: UUID) -> Optional[str]:
-    """Fetch the disease with the highest case count in the last 7 days for a district."""
+    """Fetch the disease with the highest case count in the last 30 days for a district.
+
+    Note: 30 days (not 7) because realistic Indian HMIS disease_reports are
+    sparse — many districts report weekly or biweekly. A 7-day window would
+    frequently return nothing and starve the insight of a forecast. 30 days
+    captures the meaningful top-disease signal without losing recency.
+    """
     row = await Database.fetchrow(
         """
         SELECT disease_name
         FROM disease_reports dr
         JOIN health_facilities hf ON hf.id = dr.facility_id
         WHERE hf.district_id = $1
-          AND dr.reported_date >= CURRENT_DATE - INTERVAL '7 days'
+          AND dr.reported_date >= CURRENT_DATE - INTERVAL '30 days'
         GROUP BY disease_name
         ORDER BY SUM(dr.case_count) DESC
         LIMIT 1
@@ -241,22 +352,49 @@ async def get_insight(facility_id: UUID) -> InsightResponse:
     priority_rank = risk_result["priority_rank"]
 
     # Step 6: Disease forecast
-    forecast_7day = []
+    forecast_7day: list[dict] = []
     if district_id:
         top_disease = await _fetch_top_disease(district_id)
         if top_disease:
             forecast_7day = await _get_forecast(top_disease, district_id)
 
-    # Step 6.5: LLM synthesis for HIGH priority
+    # Step 6.5: LLM synthesis for HIGH *or* MEDIUM priority (anything where
+    # statistical or rules signals exist). LOW-priority facilities still
+    # get a forecast + anomaly score, but don't burn an LLM call.
     what_is_happening = None
     why_it_happening = None
     recommended_action = None
     llm_generated = False
 
-    if priority_rank == "HIGH":
-        rag_query = f"{facility_name} {', '.join(f.get('rule_name', '') for f in rule_flags)}"
+    if priority_rank in {"HIGH", "MEDIUM"}:
+        # Build a rich, trend-aware context for the LLM instead of just
+        # passing today's snapshot. The LLM is then asked (via the
+        # synthesizer's SYSTEM_PROMPT) to cite the trajectory.
+        trajectory = await _fetch_trajectory(facility_id, days=14)
+        trajectory_summary = _summarize_trajectory(trajectory)
+        recent_alerts = await _fetch_recent_alerts_for_facility(facility_id, limit=5)
+
+        context = {
+            "facility":      facility_name,
+            "district_id":   str(district_id) if district_id else None,
+            "today":         metrics,
+            "trajectory_14d": trajectory,
+            "trajectory_summary": trajectory_summary,
+            "z_scores":      z_scores,
+            "anomaly_score": round(anomaly_score, 4),
+            "rule_flags":    [r.get("rule_name") for r in rule_flags],
+            "recent_alerts": recent_alerts,
+            "top_disease_in_district_last_7d": top_disease,
+            "forecast_7day": forecast_7day,
+        }
+
+        rag_query = (
+            f"{facility_name} "
+            f"{', '.join(f.get('rule_name', '') for f in rule_flags)} "
+            f"{top_disease or ''}"
+        )
         rag_chunks = rag.retrieve(rag_query)
-        llm_result = llm.synthesize(context=metrics, rag_chunks=rag_chunks)
+        llm_result = llm.synthesize(context=context, rag_chunks=rag_chunks)
         what_is_happening = llm_result.get("what_is_happening")
         why_it_happening = llm_result.get("why_it_happening")
         recommended_action = llm_result.get("recommended_action")
