@@ -1,0 +1,6 @@
+# Development / test dependencies. Installed in CI on top of requirements.txt.
+-r requirements.txt
+
+# Test framework (Day 24+)
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
