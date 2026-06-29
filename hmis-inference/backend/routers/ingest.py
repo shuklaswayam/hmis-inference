@@ -1,9 +1,10 @@
 from datetime import date
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Request, status
 
 from backend.database import Database
+from backend.inference.bulk_ingest import perform_bulk_ingest
 from backend.schemas import (
     DiseaseReportCreate,
     DiseaseReportResponse,
@@ -159,3 +160,14 @@ async def create_facility_metrics(
         deliveries=row["deliveries"],
         created_at=row["created_at"].isoformat(),
     )
+
+@router.post("/csv", summary="Bulk-ingest facility_metrics from a CSV body")
+async def ingest_csv(request: Request) -> dict:
+    """Parse + validate + insert. Returns a per-row report."""
+    body = (await request.body()).decode("utf-8", errors="replace")
+    if len(body) > 2_000_000:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="CSV body exceeds 2MB cap — split the upload.",
+        )
+    return await perform_bulk_ingest(body)

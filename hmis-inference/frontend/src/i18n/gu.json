@@ -1,0 +1,34 @@
+{
+  "shell.brand": "આર્ટમ",
+  "shell.tagline": "ગુજરાત એચએમઆઈએસ",
+  "shell.nav.dashboard": "ડેશબોર્ડ",
+  "shell.nav.facilities": "સુવિધાઓ",
+  "shell.nav.analytics": "વિશ્લેષણ",
+  "shell.nav.audit": "ઓડિટ",
+  "shell.nav.settings": "સેટિંગ્સ",
+  "shell.signin": "સાઇન ઇન",
+  "shell.signout": "સાઇન આઉટ",
+  "shell.live": "લાઇવ",
+  "shell.connecting": "જોડાણ થઈ રહ્યું છે…",
+
+  "login.title": "સાઇન ઇન",
+  "login.subtitle": "ગુજરાત એચએમઆઈએસ ઇન્ટેલિજન્સ પ્લેટફોર્મ.",
+  "login.email": "ઇમેઇલ",
+  "login.password": "પાસવર્ડ",
+  "login.submit": "સાઇન ઇન",
+  "login.submitting": "સાઇન ઇન થઈ રહ્યું છે…",
+  "login.commissioner.hint": "ટિપ્સ: પ્રથમ કમિશનર scripts/create_commissioner.py દ્વારા બનાવો.",
+
+  "dashboard.title": "આરોગ્ય કમિશનર ડેશબોર્ડ",
+  "dashboard.subtitle": "ચાર વર્કસ્ટ્રીમ, દર ૧૫ મિનિટે રિફ્રેશ.",
+  "dashboard.focus": "ફોકસ",
+  "dashboard.allGujarat": "બધું ગુજરાત",
+
+  "widget.outbreak.title": "રોગચાળો જોખમ",
+  "widget.pressure.title": "હોસ્પિટલ દબાણ",
+  "widget.priority.title": "આજની પ્રાથમિકતા",
+  "widget.memo.title": "પોલિસી મેમો — દૈનિક સારાંશ",
+
+  "audit.title": "ઇન્ફરન્સ ઓડિટ લોગ",
+  "audit.rows": "પંક્તિઓ"
+}

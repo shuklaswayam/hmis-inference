@@ -1,33 +1,49 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 
 import { AppShell } from '@/layouts/AppShell'
-import OverviewPage from '@/pages/OverviewPage'
-import AlertsPage from '@/pages/AlertsPage'
-import InvestigationsPage from '@/pages/InvestigationsPage'
+import HealthCommissionerDashboard from '@/pages/HealthCommissionerDashboard'
+import AuditLogPage from '@/pages/AuditLogPage'
+import DrilldownPage from '@/pages/DrilldownPage'
+import LoginPage from '@/pages/LoginPage'
 import FacilitiesPage from '@/pages/FacilitiesPage'
 import AnalyticsPage from '@/pages/AnalyticsPage'
-import AIPage from '@/pages/AIPage'
-import ReportsPage from '@/pages/ReportsPage'
-import SettingsPage from '@/pages/SettingsPage'
 import { NotFoundPage } from '@/pages/placeholders'
+import { AuthProvider, useAuth } from '@/auth/AuthContext'
+import { I18nProvider } from '@/i18n'
+
+function ProtectedShell() {
+  const { isAuthenticated } = useAuth()
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />
+  }
+  return <AppShell />
+}
 
 export function AppRouter() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route element={<AppShell />}>
-          <Route index element={<OverviewPage />} />
-          <Route path="alerts" element={<AlertsPage />} />
-          <Route path="investigations" element={<InvestigationsPage />} />
-          <Route path="facilities" element={<FacilitiesPage />} />
-          <Route path="analytics" element={<AnalyticsPage />} />
-          <Route path="ai" element={<AIPage />} />
-          <Route path="reports" element={<ReportsPage />} />
-          <Route path="settings" element={<SettingsPage />} />
-          <Route path="gantt" element={<Navigate to="/reports" replace />} />
-          <Route path="*" element={<NotFoundPage />} />
-      </Route>
-    </Routes>
-  </BrowserRouter>
+      <I18nProvider>
+      <AuthProvider>
+        <Routes>
+          <Route path="login" element={<LoginPage />} />
+          <Route element={<ProtectedShell />}>
+            <Route index element={<HealthCommissionerDashboard />} />
+            <Route path="audit" element={<AuditLogPage />} />
+            <Route path="drilldown/:kind" element={<DrilldownPage />} />
+            <Route path="drilldown/:kind/:id" element={<DrilldownPage />} />
+            <Route path="drilldown/:kind/:id/:disease" element={<DrilldownPage />} />
+            <Route path="facilities" element={<FacilitiesPage />} />
+            <Route path="analytics" element={<AnalyticsPage />} />
+            <Route path="alerts" element={<Navigate to="/" replace />} />
+            <Route path="ai" element={<Navigate to="/" replace />} />
+            <Route path="investigations" element={<Navigate to="/" replace />} />
+            <Route path="reports" element={<Navigate to="/" replace />} />
+            <Route path="settings" element={<Navigate to="/" replace />} />
+            <Route path="gantt" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<NotFoundPage />} />
+         </Route>
+       </Routes>
+     </AuthProvider>
+   </BrowserRouter>
   )
 }

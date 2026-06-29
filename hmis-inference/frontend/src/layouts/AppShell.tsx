@@ -1,28 +1,34 @@
 import { useState, useEffect } from 'react'
-import { Outlet, Link, useLocation } from 'react-router-dom'
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { 
-  Activity, 
-  Search, 
-  Sun, 
-  Moon, 
-  ChevronRight, 
-  Terminal, 
-  Settings, 
-  ShieldAlert, 
+import {
+  Activity,
+  Search,
+  Sun,
+  Moon,
+  ChevronRight,
+  Terminal,
+  Settings,
+  ShieldAlert,
   LayoutDashboard,
   Brain,
   Info,
   HelpCircle,
   X,
-  MessageSquare
+  MessageSquare,
+  LogOut,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { CommandPalette } from '@/components/layout/CommandPalette'
 import { AIChat } from '@/components/AIChat'
+import { SSEToastHost } from '@/components/SSEToastHost'
+import { useAuth } from '@/auth/AuthContext'
+import { useI18n, LanguageSwitcher } from '@/i18n'
 
 export function AppShell() {
   const { pathname } = useLocation()
+  const navigate = useNavigate()
+  const { user, logout } = useAuth()
   const [isSidebarHovered, setIsSidebarHovered] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
   const [inspectorOpen, setInspectorOpen] = useState(false)
@@ -59,12 +65,15 @@ export function AppShell() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  const navItems = [
-    { label: 'Overview', to: '/', icon: LayoutDashboard },
-    { label: 'Alerts', to: '/alerts', icon: ShieldAlert, badge: '3' },
-    { label: 'Investigations', to: '/investigations', icon: Terminal },
-    { label: 'AI Intelligence', to: '/ai', icon: Brain },
-    { label: 'Settings', to: '/settings', icon: Settings },
+  const { t } = useI18n()
+  const NAV_ITEMS_RAW = [
+    { key: 'shell.nav.dashboard',  to: '/',           icon: LayoutDashboard },
+    { key: 'shell.nav.facilities', to: '/facilities', icon: Activity       },
+    { key: 'shell.nav.analytics',  to: '/analytics',  icon: Terminal       },
+    { key: 'shell.nav.audit',      to: '/audit',      icon: ShieldAlert    },
+    { key: 'shell.nav.settings',   to: '/settings',   icon: Settings       },
+  ]
+  const navItems = NAV_ITEMS_RAW.map((item) => ({ ...item, label: t(item.key) }))
   ]
 
   const isNavActive = (to: string) => {
@@ -156,9 +165,9 @@ export function AppShell() {
                   </motion.span>
                 )}
 
-                {(!sidebarCollapsed || isSidebarHovered) && item.badge && (
+                {(!sidebarCollapsed || isSidebarHovered) && (item as { badge?: string }).badge && (
                   <span className="mr-3 px-1.5 py-0.2 rounded text-[10px] font-mono font-semibold bg-accent/10 text-accent border border-accent/20">
-                    {item.badge}
+                    {(item as { badge?: string }).badge}
                   </span>
                 )}
               </Link>
@@ -229,7 +238,10 @@ export function AppShell() {
               <kbd className="text-[9px] font-mono opacity-60 bg-background border border-border/40 px-1 rounded">⌘K</kbd>
             </button>
 
-            {/* Dark / Light Toggle */}
+            
+
+            {/* Language switcher — Phase 6 i18n (en/hi/gu). */}
+            <LanguageSwitcher />{/* Dark / Light Toggle */}
             <button
               onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
               className="h-7 w-7 rounded border border-border/40 hover:bg-secondary/40 flex items-center justify-center transition-colors text-muted-foreground hover:text-foreground"
@@ -265,7 +277,31 @@ export function AppShell() {
             >
               <Info className="h-3.5 w-3.5" />
             </button>
-          </div>
+          
+
+            {user ? (
+              <div
+                className="flex items-center gap-1.5 h-7 px-2 rounded border border-border/40 bg-secondary/30 text-muted-foreground"
+                aria-label="account chip"
+              >
+                <span className="text-[10px] tracking-wider uppercase font-semibold">
+                  {user.full_name.split(' ')[0] || user.email}
+             </span>
+                <span className="text-[9px] tracking-widest uppercase text-muted-foreground/80">
+                  {user.role}
+             </span>
+                <button
+                  type="button"
+                  onClick={() => { logout(); navigate('/login', { replace: true }) }}
+                  className="h-5 w-5 rounded hover:bg-secondary/60 grid place-items-center text-muted-foreground hover:text-foreground"
+                  aria-label="Sign out"
+                  title="Sign out"
+                >
+                  <LogOut className="h-3 w-3" />
+             </button>
+            </div>
+            ) : null}
+         </div>
         </header>
 
         {/* Center Canvas */}
@@ -275,6 +311,10 @@ export function AppShell() {
           </div>
         </main>
       </div>
+
+      {/* SSE Toast Host — overlays the canvas when a CRITICAL
+                transition arrives via /api/v1/realtime/events. */}
+      <SSEToastHost />
 
       {/* 3. Optional Right Inspector Drawer */}
       <AnimatePresence>
