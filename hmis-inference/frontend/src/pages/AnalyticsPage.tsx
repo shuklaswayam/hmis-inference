@@ -23,6 +23,7 @@ interface Alert {
 }
 
 const SEVERITY_COLORS: Record<string, string> = {
+  CRITICAL: 'hsl(var(--severity-critical))',
   HIGH: 'hsl(var(--severity-critical))',
   MEDIUM: 'hsl(var(--severity-medium))',
   LOW: 'hsl(var(--severity-low))',
@@ -45,7 +46,11 @@ export default function AnalyticsPage() {
 
   // Compute severity distribution
   const severityData = [
-    { name: 'Critical', value: alerts.filter((a) => a.severity === 'HIGH').length, color: SEVERITY_COLORS.HIGH },
+    {
+      name: 'Critical',
+      value: alerts.filter((a) => a.severity === 'HIGH' || a.severity === 'CRITICAL').length,
+      color: SEVERITY_COLORS.HIGH,
+    },
     { name: 'Warning', value: alerts.filter((a) => a.severity === 'MEDIUM').length, color: SEVERITY_COLORS.MEDIUM },
     { name: 'Low', value: alerts.filter((a) => a.severity === 'LOW').length, color: SEVERITY_COLORS.LOW },
   ]
@@ -56,7 +61,7 @@ export default function AnalyticsPage() {
     const name = a.district_name || 'Unknown'
     if (!districtMap.has(name)) districtMap.set(name, { high: 0, medium: 0, low: 0 })
     const bucket = districtMap.get(name)!
-    if (a.severity === 'HIGH') bucket.high++
+    if (a.severity === 'HIGH' || a.severity === 'CRITICAL') bucket.high++
     else if (a.severity === 'MEDIUM') bucket.medium++
     else bucket.low++
   })

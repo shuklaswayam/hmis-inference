@@ -43,14 +43,14 @@ export default function HealthCommissionerDashboard() {
             }
           >
             {status === 'open' ? 'live' : status === 'closed' ? 'disconnected' : 'connecting…'}
-      </span>
+         </span>
         }
       />
 
       <Card className="p-4 border-border/80 bg-card/60 backdrop-blur-md flex flex-wrap items-center gap-3">
         <label className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           Focus
-      </label>
+       </label>
         <select
           value={districtId ?? ''}
           onChange={(e) => setDistrictId(e.target.value || null)}
@@ -62,7 +62,7 @@ export default function HealthCommissionerDashboard() {
           <option value="123287fb-a1db-443f-9cdf-ee5fbb8e8e99">Vadodara</option>
           <option value="83bcb628-4b2f-465d-b419-c5262320055b">Rajkot</option>
           <option value="3515b643-184f-48aa-ba7d-0997b7ae2d53">Bhavnagar</option>
-      </select>
+       </select>
         <select
           value={diseaseName ?? ''}
           onChange={(e) => setDiseaseName(e.target.value || null)}
@@ -73,30 +73,19 @@ export default function HealthCommissionerDashboard() {
           <option value="Malaria">Malaria</option>
           <option value="Chikungunya">Chikungunya</option>
           <option value="Diarrheal">Diarrheal</option>
-      </select>
+       </select>
         <span className="ml-auto text-[10px] text-muted-foreground">
           Updates every 15 minutes
-      </span>
-    </Card>
+       </span>
+     </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <OutbreakRiskWidget districtId={districtId} diseaseName={diseaseName} />
         <HospitalPressureWidget districtId={districtId} />
         <PriorityRankWidget districtId={districtId} />
-        <div className="rounded-lg border border-dashed border-border/60 p-4 text-[12px] text-muted-foreground space-y-2 bg-card/40">
-          <h3 className="text-subheading font-semibold tracking-tight text-foreground">
-            Daily Brief
-        </h3>
-          <p>
-            The Policy Memo aggregator reads WS1 + WS2 + WS3 outputs and
-            acts as the Commissioner&apos;s single-page brief. Open the
-            collapsible panel below — actions are pre-cited against the
-            ranked list above.
-        </p>
-      </div>
-    </div>
+     </div>
 
       <PolicyMemoPanel districtId={districtId} />
-  </section>
+   </section>
   )
 }

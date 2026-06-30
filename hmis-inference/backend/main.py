@@ -36,13 +36,13 @@ from backend.routers import (
 )
 from backend.routers.audit import router as inference_audit_router
 from backend.routers.auth import router as auth_router
+from backend.routers.analytics import router as analytics_router
 from backend.routers.drilldown import router as inference_drilldown_router
 from backend.routers.health_route import router as health_router
 from backend.routers.realtime import router as realtime_router
 from backend.routers.metrics_route import router as metrics_route_router
 
-# Legacy routers — retained for backward-compat surface area.
-from backend._legacy.alerts import router as alerts_router
+# Legacy packages — retained for archaeology (alerts router is NOT mounted; see above).
 from backend._legacy.insights import router as insights_router
 from backend._legacy.qa import router as qa_router
 from backend._legacy.websocket import router as websocket_router
@@ -177,9 +177,12 @@ app.include_router(inference_drilldown_router)  # /api/v1/inference/drilldown/{f
 app.include_router(realtime_router)             # /api/v1/realtime/{events,priority}  (SSE)
 app.include_router(metrics_route_router)        # /metrics
 app.include_router(auth_router)                 # /api/v1/auth/{login,refresh,me,register,logout}
+app.include_router(analytics_router)           # /api/v1/alerts  (analytics read-only — sole owner of GET /)
 
 # Legacy routers — retained for backward-compat surface area.
-app.include_router(alerts_router)               # /api/v1/alerts
+# NOTE: legacy alerts_router (prefix=/api/v1/alerts) is intentionally NOT mounted
+# because analytics_router above owns GET /api/v1/alerts/. The legacy module
+# remains importable from backend._legacy.alerts for archaeology.
 app.include_router(insights_router)             # /api/v1/insights
 app.include_router(qa_router)                   # /api/v1/ask
 app.include_router(websocket_router)            # /ws/alerts
