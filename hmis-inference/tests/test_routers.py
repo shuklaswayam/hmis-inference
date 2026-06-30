@@ -20,7 +20,7 @@ from tests import conftest  # noqa: F401
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. Alerts — GET /api/v1/alerts/
 # ─────────────────────────────────────────────────────────────────────────────
-@patch("backend.routers.alerts.redis_client")
+@patch("backend._legacy.alerts.redis_client")
 def test_alerts_get_returns_list(mock_redis_cls, mock_db, fastapi_client):
     """Alerts endpoint must return a list, even empty."""
     mock_redis_cls.get = AsyncMock(return_value=None)
@@ -34,7 +34,7 @@ def test_alerts_get_returns_list(mock_redis_cls, mock_db, fastapi_client):
     assert resp.json() == []
 
 
-@patch("backend.routers.alerts.redis_client")
+@patch("backend._legacy.alerts.redis_client")
 def test_alerts_with_filter_params_routes_correctly(mock_redis, mock_db, fastapi_client):
     """Query string filters pass through and don't error."""
     mock_redis.get = AsyncMock(return_value=None)

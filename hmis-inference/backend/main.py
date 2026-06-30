@@ -41,6 +41,12 @@ from backend.routers.health_route import router as health_router
 from backend.routers.realtime import router as realtime_router
 from backend.routers.metrics_route import router as metrics_route_router
 
+# Legacy routers — retained for backward-compat surface area.
+from backend._legacy.alerts import router as alerts_router
+from backend._legacy.insights import router as insights_router
+from backend._legacy.qa import router as qa_router
+from backend._legacy.websocket import router as websocket_router
+
 logger = logging.getLogger(__name__)
 
 
@@ -171,6 +177,12 @@ app.include_router(inference_drilldown_router)  # /api/v1/inference/drilldown/{f
 app.include_router(realtime_router)             # /api/v1/realtime/{events,priority}  (SSE)
 app.include_router(metrics_route_router)        # /metrics
 app.include_router(auth_router)                 # /api/v1/auth/{login,refresh,me,register,logout}
+
+# Legacy routers — retained for backward-compat surface area.
+app.include_router(alerts_router)               # /api/v1/alerts
+app.include_router(insights_router)             # /api/v1/insights
+app.include_router(qa_router)                   # /api/v1/ask
+app.include_router(websocket_router)            # /ws/alerts
 
 
 @app.get("/", tags=["health"])

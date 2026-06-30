@@ -41,7 +41,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: frontend
+        working-directory: hmis-inference/frontend
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -49,7 +49,7 @@ jobs:
           # GitHub deprecated Node 20 on runners 2026-04; use Node 24 default.
           node-version: '24'
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: hmis-inference/frontend/package-lock.json
       - name: Install
         run: npm ci
       - name: Type-check

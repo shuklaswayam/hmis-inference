@@ -26,12 +26,13 @@ def anyio_backend():
 @pytest.fixture
 async def client():
     """Create an async test client with mocked database."""
+    from backend._legacy import insights  # ensure module is loaded for patching
     from backend.main import app
 
     # Mock all database operations
-    with patch("backend.database.Database.fetchrow", new_callable=AsyncMock) as mock_fetchrow, \
-         patch("backend.database.Database.fetch", new_callable=AsyncMock) as mock_fetch, \
-         patch("backend.database.Database.execute", new_callable=AsyncMock) as mock_execute:
+    with patch("backend._legacy.insights.Database.fetchrow", new_callable=AsyncMock) as mock_fetchrow, \
+         patch("backend._legacy.insights.Database.fetch", new_callable=AsyncMock) as mock_fetch, \
+         patch("backend._legacy.insights.Database.execute", new_callable=AsyncMock) as mock_execute:
 
         # Default: facility 1 has metrics, unknown facility does not
         def fetchrow_side_effect(query, *args):

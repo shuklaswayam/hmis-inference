@@ -146,20 +146,19 @@ def fastapi_client(mock_db, mock_redis):
     router_modules = (
         "backend.main",
         "backend.database",
-        "backend.routers.alerts",
+        "backend._legacy.alerts",
+        "backend._legacy.insights",
+        "backend._legacy.qa",
         "backend.routers.districts",
+        "backend.routers.drilldown",
         "backend.routers.facilities",
         "backend.routers.forecast",
         "backend.routers.ingest",
-        "backend.routers.insights",
         "backend.routers.metrics",
-        "backend.routers.qa",
     )
     with ExitStack() as stack:
         for module in router_modules:
             stack.enter_context(patch(f"{module}.Database", mock_db))
-        stack.enter_context(patch("backend.routers.alerts.redis_client", mock_redis))
-        stack.enter_context(patch("backend.routers.qa.redis_client", mock_redis))
         from fastapi.testclient import TestClient
         from backend.main import app
         yield TestClient(app)

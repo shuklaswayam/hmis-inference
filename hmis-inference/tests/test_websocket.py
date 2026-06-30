@@ -47,7 +47,7 @@ def test_websocket_route_is_websocket_upgrade():
     assert ws_routes[0].path_format == ws_routes[0].path
 
 
-@patch("backend.routers.websocket.aioredis")
+@patch("backend._legacy.websocket.aioredis")
 def test_websocket_handshake_emits_connected_frame(mock_aioredis):
     """Connecting to /ws/alerts immediately sends ``{"type": "connected"}`` —
     clients rely on this to detect a failed channel before any alert lands."""
@@ -85,7 +85,7 @@ def test_websocket_handshake_emits_connected_frame(mock_aioredis):
             assert data["type"] == "connected"
 
 
-@patch("backend.routers.websocket.aioredis")
+@patch("backend._legacy.websocket.aioredis")
 def test_websocket_publishes_alert_payload(mock_aioredis):
     """If a message lands on the channel, the ws broadcasts it verbatim."""
     from fastapi.testclient import TestClient

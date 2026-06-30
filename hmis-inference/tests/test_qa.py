@@ -21,12 +21,12 @@ def _make_client():
         for module in (
             "backend.main",
             "backend.database",
-            "backend.routers.alerts",
-            "backend.routers.qa",
+            "backend._legacy.alerts",
+            "backend._legacy.qa",
         ):
             stack.enter_context(patch(f"{module}.Database"))
-        stack.enter_context(patch("backend.routers.alerts.redis_client"))
-        stack.enter_context(patch("backend.routers.qa.redis_client"))
+        stack.enter_context(patch("backend._legacy.alerts.redis_client"))
+        stack.enter_context(patch("backend._legacy.qa.redis_client"))
         from backend.main import app
         return TestClient(app)
 
@@ -65,10 +65,10 @@ def _attach_rag_returns(mock_rag, chunks):
     )
 
 
-@patch("backend.routers.qa.Database")
-@patch("backend.routers.qa.redis_client")
-@patch("backend.routers.qa.llm")
-@patch("backend.routers.qa.rag")
+@patch("backend._legacy.qa.Database")
+@patch("backend._legacy.qa.redis_client")
+@patch("backend._legacy.qa.llm")
+@patch("backend._legacy.qa.rag")
 def test_ask_success(mock_rag, mock_llm, mock_redis, mock_db):
     _attach_rag_returns(
         mock_rag,
@@ -109,9 +109,9 @@ def test_ask_success(mock_rag, mock_llm, mock_redis, mock_db):
     assert "timestamp" in data
 
 
-@patch("backend.routers.qa.redis_client")
-@patch("backend.routers.qa.llm")
-@patch("backend.routers.qa.rag")
+@patch("backend._legacy.qa.redis_client")
+@patch("backend._legacy.qa.llm")
+@patch("backend._legacy.qa.rag")
 def test_ask_no_district(mock_rag, mock_llm, mock_redis):
     _attach_rag_returns(
         mock_rag,
@@ -144,10 +144,10 @@ def test_ask_no_district(mock_rag, mock_llm, mock_redis):
     assert "sources" in data
 
 
-@patch("backend.routers.qa.redis_client")
-@patch("backend.routers.qa.Database")
-@patch("backend.routers.qa.llm")
-@patch("backend.routers.qa.rag")
+@patch("backend._legacy.qa.redis_client")
+@patch("backend._legacy.qa.Database")
+@patch("backend._legacy.qa.llm")
+@patch("backend._legacy.qa.rag")
 def test_ask_irrelevant_query(mock_rag, mock_llm, mock_db_qa, mock_redis):
     """Out-of-corpus question — RAG returns empty so the endpoint short-circuits
     to its refusal branch (lines 432–447 of qa.py) without ever calling the LLM."""
@@ -171,9 +171,9 @@ def test_ask_irrelevant_query(mock_rag, mock_llm, mock_db_qa, mock_redis):
     assert data["confidence"] == "low"
 
 
-@patch("backend.routers.qa.redis_client")
-@patch("backend.routers.qa.llm")
-@patch("backend.routers.qa.rag")
+@patch("backend._legacy.qa.redis_client")
+@patch("backend._legacy.qa.llm")
+@patch("backend._legacy.qa.rag")
 def test_ask_uses_cache(mock_rag, mock_llm, mock_redis):
     cached = {
         "question": "Cached question?",
