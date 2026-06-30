@@ -38,4 +38,27 @@ client.interceptors.request.use((config) => {
   return config
 })
 
+// Self-healing on 401: if the request carried a stored token that
+// the backend has rejected (TTL expired / signature rotated / logout-
+// blacklisted), drop the local auth state and signal AuthContext via
+// a window event so the router can bounce the user to /login. The
+// `hadToken` guard prevents an infinite clear-and-retry loop after
+// the user is already signed out (no token → no event).
+client.interceptors.response.use(undefined, (error) => {
+  const status = error?.response?.status
+  if (status !== 401) return Promise.reject(error)
+  if (typeof window === 'undefined') return Promise.reject(error)
+  try {
+    const hadToken = !!window.localStorage.getItem('hmis:auth:access')
+    if (!hadToken) return Promise.reject(error)
+    window.localStorage.removeItem('hmis:auth:access')
+    window.localStorage.removeItem('hmis:auth:refresh')
+    window.localStorage.removeItem('hmis:auth:user')
+    window.dispatchEvent(new CustomEvent('hmis:auth:expired'))
+  } catch (_) {
+    // ignore — the worst case is the user sees the original error
+  }
+  return Promise.reject(error)
+})
+
 export default client

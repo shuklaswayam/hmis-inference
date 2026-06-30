@@ -120,9 +120,11 @@ class FacilityLoadForecaster:
 
         # Trend classification: rising if most-recent yhat > first yhat
         # by >= 2 percentage points (over the horizon); easing if it
-        # drops by >= 2; otherwise stable.
-        icu_first = float(icu_fc[0]["yhat"])
-        icu_last = float(icu_fc[-1]["yhat"])
+        # drops by >= 2; otherwise stable. Use ``.iloc[i]`` so we read
+        # rows positionally — ``df[i]`` is a column lookup and breaks
+        # against Prophet's frame (KeyError: 0).
+        icu_first = float(icu_fc.iloc[0]["yhat"])
+        icu_last = float(icu_fc.iloc[-1]["yhat"])
         if icu_last - icu_first >= 2.0:
             trend = "rising"
         elif icu_first - icu_last >= 2.0:
@@ -136,20 +138,20 @@ class FacilityLoadForecaster:
             horizon_days=horizon_days,
             series=[
                 {
-                    "ds": str(row["ds"]),
-                    "icu_yhat": float(icu_fc[i]["yhat"]),
-                    "icu_lower": float(icu_fc[i]["yhat_lower"]),
-                    "icu_upper": float(icu_fc[i]["yhat_upper"]),
-                    "bed_yhat": float(bed_fc[i]["yhat"]),
-                    "bed_lower": float(bed_fc[i]["yhat_lower"]),
-                    "bed_upper": float(bed_fc[i]["yhat_upper"]),
+                    "ds": str(icu_fc.iloc[i]["ds"]),
+                    "icu_yhat": float(icu_fc.iloc[i]["yhat"]),
+                    "icu_lower": float(icu_fc.iloc[i]["yhat_lower"]),
+                    "icu_upper": float(icu_fc.iloc[i]["yhat_upper"]),
+                    "bed_yhat": float(bed_fc.iloc[i]["yhat"]),
+                    "bed_lower": float(bed_fc.iloc[i]["yhat_lower"]),
+                    "bed_upper": float(bed_fc.iloc[i]["yhat_upper"]),
                 }
-                for i, row in enumerate(icu_fc)
+                for i in range(len(icu_fc))
             ],
             trend=trend,
-            icu_pred_24h=float(icu_pad[1]["yhat"]) if len(icu_pad) >= 2 else float(icu_pad[0]["yhat"]),
+            icu_pred_24h=float(icu_pad.iloc[1]["yhat"]) if len(icu_pad) >= 2 else float(icu_pad.iloc[0]["yhat"]),
             icu_pred_48h=float(icu_last),
-            bed_pred_48h=float(bed_fc[-1]["yhat"]),
+            bed_pred_48h=float(bed_fc.iloc[-1]["yhat"]),
         )
 
     def _fit(self, df: pd.DataFrame) -> Prophet:

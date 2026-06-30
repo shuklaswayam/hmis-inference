@@ -85,6 +85,26 @@ def _weekly_slope(series: list[int]) -> float:
     return num / den if den else 0.0
 
 
+def _daily_series(entries: list[dict]) -> list[dict]:
+    """Collapse multiple rows per (facility, date) into a per-day series.
+
+    With >250 facilities × 12 diseases generating multiple rows per
+    (district, disease), slicing by row would underestimate recent
+    windows. Aggregate by date first so 14-day sums are day-aligned
+    with the inference lookback.
+    """
+    by_date: dict = {}
+    for e in entries:
+        d = e["reported_date"]
+        agg = by_date.setdefault(d, {"cases": 0, "deaths": 0})
+        agg["cases"] += int(e["case_count"] or 0)
+        agg["deaths"] += int(e["deaths"] or 0)
+    series = [
+        {"date": d, **v} for d, v in sorted(by_date.items(), key=lambda kv: kv[0])
+    ]
+    return series
+
+
 def compute_features(rows: list[dict]) -> tuple[list[dict], list[str]]:
     """Two clean passes: feature rows ordered, then a tiny post-pass
     attaching per-district z-scores over baseline ratios."""
@@ -97,24 +117,24 @@ def compute_features(rows: list[dict]) -> tuple[list[dict], list[str]]:
     ratios_by_district: dict[str, list[float]] = defaultdict(list)
 
     for (_district, _disease), entries in by_key.items():
-        entries.sort(key=lambda r: r["reported_date"])
-        last_14 = entries[-14:]
-        baseline_pool = entries[:-14] if len(entries) > 14 else entries
+        # Aggregate by date first so windows align with inference time.
+        days = _daily_series(entries)
+        last_14 = days[-14:]
+        baseline_pool = days[:-14] if len(days) > 14 else days
         baseline_pool = baseline_pool[-30:] or baseline_pool
 
-        cases_last_14d = sum(int(e["case_count"] or 0) for e in last_14)
-        deaths_last_14d = sum(int(e["deaths"] or 0) for e in last_14)
+        cases_last_14d = sum(int(e["cases"]) for e in last_14)
+        deaths_last_14d = sum(int(e["deaths"]) for e in last_14)
         if baseline_pool:
             baseline_avg = (
-                sum(int(e["case_count"] or 0) for e in baseline_pool)
-                / len(baseline_pool)
+                sum(int(e["cases"]) for e in baseline_pool) / len(baseline_pool)
             )
         else:
             baseline_avg = 0.0
         baseline_ratio = (
             (cases_last_14d / 14.0) / baseline_avg if baseline_avg > 0 else 0.0
         )
-        slope = _weekly_slope([int(e["case_count"] or 0) for e in last_14])
+        slope = _weekly_slope([int(e["cases"]) for e in last_14])
 
         features.append(
             {

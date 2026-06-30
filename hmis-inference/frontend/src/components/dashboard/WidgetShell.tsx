@@ -102,7 +102,7 @@ export function WidgetShell({
         ) : isError ? (
           <div className="flex items-center gap-2 text-[12px] text-destructive">
             <AlertTriangle className="h-4 w-4" />
-            Failed to load inference output. Backend may be down.
+            We couldn't load today's data. Please refresh in a moment.
          </div>
         ) : (
           children

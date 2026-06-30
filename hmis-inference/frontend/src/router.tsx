@@ -23,27 +23,28 @@ export function AppRouter() {
   return (
     <BrowserRouter>
       <I18nProvider>
-      <AuthProvider>
-        <Routes>
-          <Route path="login" element={<LoginPage />} />
-          <Route element={<ProtectedShell />}>
-            <Route index element={<HealthCommissionerDashboard />} />
-            <Route path="audit" element={<AuditLogPage />} />
-            <Route path="drilldown/:kind" element={<DrilldownPage />} />
-            <Route path="drilldown/:kind/:id" element={<DrilldownPage />} />
-            <Route path="drilldown/:kind/:id/:disease" element={<DrilldownPage />} />
-            <Route path="facilities" element={<FacilitiesPage />} />
-            <Route path="analytics" element={<AnalyticsPage />} />
-            <Route path="alerts" element={<Navigate to="/" replace />} />
-            <Route path="ai" element={<Navigate to="/" replace />} />
-            <Route path="investigations" element={<Navigate to="/" replace />} />
-            <Route path="reports" element={<Navigate to="/" replace />} />
-            <Route path="settings" element={<Navigate to="/" replace />} />
-            <Route path="gantt" element={<Navigate to="/" replace />} />
-            <Route path="*" element={<NotFoundPage />} />
-         </Route>
-       </Routes>
-     </AuthProvider>
+        <AuthProvider>
+          <Routes>
+            <Route path="login" element={<LoginPage />} />
+            <Route element={<ProtectedShell />}>
+              <Route index element={<HealthCommissionerDashboard />} />
+              <Route path="audit" element={<AuditLogPage />} />
+              <Route path="drilldown/:kind" element={<DrilldownPage />} />
+              <Route path="drilldown/:kind/:id" element={<DrilldownPage />} />
+              <Route path="drilldown/:kind/:id/:disease" element={<DrilldownPage />} />
+              <Route path="facilities" element={<FacilitiesPage />} />
+              <Route path="analytics" element={<AnalyticsPage />} />
+              <Route path="alerts" element={<Navigate to="/" replace />} />
+              <Route path="ai" element={<Navigate to="/" replace />} />
+              <Route path="investigations" element={<Navigate to="/" replace />} />
+              <Route path="reports" element={<Navigate to="/" replace />} />
+              <Route path="settings" element={<Navigate to="/" replace />} />
+              <Route path="gantt" element={<Navigate to="/" replace />} />
+              <Route path="*" element={<NotFoundPage />} />
+           </Route>
+         </Routes>
+       </AuthProvider>
+     </I18nProvider>
    </BrowserRouter>
   )
 }

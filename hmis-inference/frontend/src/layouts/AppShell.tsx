@@ -74,7 +74,6 @@ export function AppShell() {
     { key: 'shell.nav.settings',   to: '/settings',   icon: Settings       },
   ]
   const navItems = NAV_ITEMS_RAW.map((item) => ({ ...item, label: t(item.key) }))
-  ]
 
   const isNavActive = (to: string) => {
     if (to === '/') return pathname === '/'

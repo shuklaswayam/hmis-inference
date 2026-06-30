@@ -11,7 +11,9 @@ Pure-function ranking of all candidate governance signals:
 Score = severity_w * 0.55
       + recency   * 0.25   (1 / (hours_old + 1), normalized)
       + spread    * 0.20   (facilities / diseases affected)
-      + owner_penalty      (+1) when owner is inferred generically
+      + owner_penalty      (+1) when owner is inferred generically,
+                            i.e. surfaces un-dispatchable signals for
+                            human triage instead of letting them sink.
 
 Owner mapping is a static dispatch table — kept simple and explicit
 so the inbound team can amend it without code spelunking.
@@ -263,14 +265,14 @@ def _score(c: dict, now: datetime, max_recency: float) -> tuple[float, dict]:
     owner = OWNER_BY_RULE.get(c["rule_name"])
     owner_penalty = 0.0 if owner else 1.0
 
-    # owner_penalty subtracts: known/dispatchable signals beat raw
-    # signals with no assigned owner. Net floor is ≥ 0 since
-    # the other components naturally dominate.
+    # owner_penalty ADDS to score: when no dispatchable owner is
+    # mapped, we boost the signal so a human triages it instead of
+    # letting it silently sink beneath well-mapped rule alerts.
     score = (
         sev * 0.55
         + recency_norm * 0.25 * 10.0   # rescale ~ 0..10
         + spread * 0.20
-        - owner_penalty
+        + owner_penalty
     )
 
     owner_label, _action = owner or ("State Health Commissioner", "")

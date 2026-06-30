@@ -57,6 +57,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     else window.localStorage.removeItem(LS_REFRESH)
   }, [refreshToken])
 
+  // Self-healing: the axios client in api/client.js dispatches a
+  // 'hmis:auth:expired' window event whenever it sees a 401 with a
+  // token attached. Drop in-memory state here so ProtectedShell
+  // bounces the user to /login instead of rendering an empty
+  // dashboard over an invalid session.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const handler = () => {
+      setUser(null)
+      setAccess(null)
+      setRefresh(null)
+    }
+    window.addEventListener('hmis:auth:expired', handler)
+    return () => window.removeEventListener('hmis:auth:expired', handler)
+  }, [])
+
   const login = useCallback(async (email: string, password: string) => {
     const baseURL = (import.meta as any).env?.VITE_API_BASE_URL ?? ''
     const res = await fetch(`${baseURL}/api/v1/auth/login`, {

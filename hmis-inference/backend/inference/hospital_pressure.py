@@ -154,8 +154,8 @@ async def score(
         ]
 
         # 48-hour projection — best effort; degrade gracefully.
-        proj = await _projection(fid)
-        trend = proj["trend"] if proj else "stable"
+        proj = await _projection(fid) or {}
+        trend = proj.get("trend", "stable")
         icu24 = proj.get("icu_pred_24h")
         icu48 = proj.get("icu_pred_48h")
         bed48 = proj.get("bed_pred_48h")

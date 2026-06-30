@@ -41,8 +41,8 @@ export function OutbreakRiskWidget({ districtId, diseaseName }: OutbreakRiskWidg
 
   return (
     <WidgetShell
-      title="Outbreak Risk"
-      subtitle="Per ward × disease, 14-day baseline vs. recent"
+      title="Outbreaks Today"
+      subtitle="Where disease cases are rising fastest"
       severity={query.data?.severity ?? null}
       confidence={query.data?.confidence ?? null}
       generatedAt={query.data?.generated_at ?? null}
@@ -52,7 +52,7 @@ export function OutbreakRiskWidget({ districtId, diseaseName }: OutbreakRiskWidg
     >
       {visible.length === 0 ? (
         <p className="text-[12px] text-muted-foreground">
-          No active outbreak signals at this scope.
+          No outbreaks to report today.
        </p>
       ) : (
         <ul className="space-y-2">
@@ -74,10 +74,9 @@ export function OutbreakRiskWidget({ districtId, diseaseName }: OutbreakRiskWidg
                </span>
              </div>
               <p className="text-muted-foreground mt-1 line-clamp-2">{s.recommended_action}</p>
-              <p className="text-[10px] text-muted-foreground/70 mt-0.5">
-                {Math.round(s.confidence * 100)}% confidence ·{' '}
-                {s.cases_last_14d} cases · {s.baseline_ratio.toFixed(1)}× baseline
-             </p>
+                <p className="text-[11px] text-muted-foreground/80 mt-0.5">
+                  {s.cases_last_14d} case{s.cases_last_14d === 1 ? '' : 's'} reported in the last 14 days
+               </p>
            </li>
           ))}
        </ul>

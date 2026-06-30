@@ -18,7 +18,7 @@ export function LanguageSwitcher() {
         className="h-6 px-1.5 rounded border border-border/60 bg-secondary/30 text-foreground text-[10px] tracking-wider focus:outline-none focus:border-accent"
       >
         {SUPPORTED_LOCALES.map((l) => (
-          <option key={l.code} value={l.code}>{l.label</option>
+          <option key={l.code} value={l.code}>{l.label}</option>
         ))}
      </select>
    </label>

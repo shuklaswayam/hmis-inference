@@ -158,7 +158,7 @@ export function PolicyMemoPanel({ districtId, defaultOpen = false }: PolicyMemoP
                           >
                             <p className="text-[12px] text-foreground">{a.action}</p>
                             <p className="text-[10px] text-muted-foreground mt-0.5">
-                              Owner · {a.owner}  ·  SLA · {a.sla_hours}h
+                              Owner · {a.owner}  ·  Complete within {a.sla_hours} hours
                            </p>
                          </li>
                         ))}

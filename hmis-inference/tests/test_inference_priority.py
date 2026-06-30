@@ -54,13 +54,16 @@ def test_score_increases_with_recency():
     assert s_new > s_old
 
 
-def test_score_penalizes_unknown_owner():
+def test_score_boosts_unknown_owner_for_triage():
+    # Per spec: owner_penalty ADDS +1 when no dispatchable owner is
+    # mapped, so the signal is promoted into the human-triage queue
+    # rather than silently dropped beneath well-mapped rule alerts.
     now = datetime.now(timezone.utc)
     known = _candidate("icu_overload", "HIGH", age_hours=0)
     unknown = _candidate("totally_unknown_signal", "HIGH", age_hours=0)
     s_known, _ = _score(known, now, max_recency=1.0)
     s_unknown, _ = _score(unknown, now, max_recency=1.0)
-    assert s_known > s_unknown
+    assert s_unknown > s_known
 
 
 def test_sla_hours_critical_default():

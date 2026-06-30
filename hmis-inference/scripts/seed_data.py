@@ -86,8 +86,8 @@ DISTRICT_FACILITY_TARGETS = {
 }
 
 
-def _facility_district_total(targets: dict[str, dict[str, int]]) -> int:
-    return sum(counts.values() for counts in targets.values())
+def _facility_district_total(targets: dict[str, int]) -> int:
+    return sum(targets.values())
 
 
 def _facility_total(totals: dict[str, int]) -> int:
@@ -154,14 +154,28 @@ def get_connection():
 
 
 def seed_districts(conn) -> dict[str, str]:
+    """Insert the 5 canonical districts (no-op if already present).
+
+    Avoids ``ON CONFLICT (name)`` because the schema does not enforce
+    a unique constraint on ``districts.name``. Instead we look up an
+    existing row first and insert only when missing — keeps the run
+    idempotent without depending on schema migrations.
+    """
     district_ids: dict[str, str] = {}
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         for d in DISTRICTS:
             cur.execute(
+                "SELECT id FROM districts WHERE name = %(name)s",
+                {"name": d["name"]},
+            )
+            existing = cur.fetchone()
+            if existing is not None:
+                district_ids[d["name"]] = existing["id"]
+                continue
+            cur.execute(
                 """
                 INSERT INTO districts (name, state, population, zone)
                 VALUES (%(name)s, %(state)s, %(population)s, %(zone)s)
-                ON CONFLICT (name) DO UPDATE SET state = EXCLUDED.state
                 RETURNING id
                 """,
                 d,
@@ -275,14 +289,20 @@ def main() -> None:
         counts = verify_counts(conn)
         print("\n=== Verification ===")
         print(f"Total districts:  {counts['districts']}")
-        print(f"Total facilities: {counts['facilities']}")
+        print(f"Total facilities: {counts['facilities']}  (procedural target: 256)")
         print("Facilities per district:")
         for row in counts["per_district"]:
             print(f"  {row['name']}: {row['n']}")
-        if counts["facilities"] != 256:
+        if counts["facilities"] < 256:
             print(
                 f"\nNOTE: configured for 256; DB has {counts['facilities']} "
                 "(re-run is safe — uuid5 IDs make inserts no-op)."
+            )
+        elif counts["facilities"] > 256:
+            extra = counts["facilities"] - 256
+            print(
+                f"\nNOTE: 256 procedurally generated + {extra} pre-existing "
+                "named facilities (real Gujarat hospitals) preserved."
             )
 
         print("\nTraining Outbreak Risk Classifier (Workstream 1)…")

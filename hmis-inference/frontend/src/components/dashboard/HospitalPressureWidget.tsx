@@ -51,7 +51,7 @@ export function HospitalPressureWidget({ districtId, facilityId }: HospitalPress
   return (
     <WidgetShell
       title="Hospital Pressure"
-      subtitle="Per facility · 48-hour trend projection"
+      subtitle="Where hospitals are stretched thin"
       severity={query.data?.severity ?? null}
       confidence={query.data?.confidence ?? null}
       generatedAt={query.data?.generated_at ?? null}
@@ -82,7 +82,7 @@ export function HospitalPressureWidget({ districtId, facilityId }: HospitalPress
     >
       {visible.length === 0 ? (
         <p className="text-[12px] text-muted-foreground">
-          No facility pressure signals in scope.
+          All hospitals are operating normally today.
        </p>
       ) : (
         <ul className="space-y-2.5">
@@ -104,13 +104,12 @@ export function HospitalPressureWidget({ districtId, facilityId }: HospitalPress
                   <span>Bed {s.bed_occupancy_pct.toFixed(0)}%</span>
                   <span className="inline-flex items-center gap-1">
                     {trendIcon(s.trend_48h)}
-                    48&nbsp;h&nbsp;{s.trend_48h}
+                    {s.trend_48h === 'rising' ? 'getting worse' : s.trend_48h === 'easing' ? 'easing' : 'steady'}
                  </span>
                </div>
                 {s.icu_pred_48h != null ? (
-                  <p className="text-[10px] text-muted-foreground/70 mt-0.5">
-                    Projection · ICU → {s.icu_pred_48h.toFixed(0)}% · bed →{' '}
-                    {s.bed_pred_48h?.toFixed(0) ?? '—'}%
+                  <p className="text-[11px] text-muted-foreground/80 mt-0.5">
+                    Expected in 48 hours · ICU {s.icu_pred_48h.toFixed(0)}% · beds {s.bed_pred_48h?.toFixed(0) ?? '—'}%
                  </p>
                 ) : null}
              </div>

@@ -33,8 +33,8 @@ export function PriorityRankWidget({ districtId }: PriorityRankWidgetProps) {
 
   return (
     <WidgetShell
-      title="Priority Actions Today"
-      subtitle="Top 5 ranked policy items · owner + SLA"
+      title="Actions to Take Today"
+      subtitle="Top 5 actions, ranked by urgency"
       severity={query.data?.severity ?? null}
       confidence={query.data?.confidence ?? null}
       generatedAt={query.data?.generated_at ?? null}
@@ -44,7 +44,7 @@ export function PriorityRankWidget({ districtId }: PriorityRankWidgetProps) {
     >
       {ranked.length === 0 ? (
         <p className="text-[12px] text-muted-foreground">
-          No priority items — operations are within normal range.
+          All clear — no urgent actions needed today.
        </p>
       ) : (
         <ol className="space-y-2.5">
@@ -67,8 +67,8 @@ export function PriorityRankWidget({ districtId }: PriorityRankWidgetProps) {
                     >
                       {action.severity}
                    </span>
-                    <span className="text-[10px] text-muted-foreground">
-                      severity score {action.severity_score.toFixed(2)}
+                              <span className="text-[10px] text-muted-foreground">
+                                urgency · today's #{action.rank}
                    </span>
                  </div>
                   <p className="text-[12px] text-foreground leading-snug mt-1">
@@ -82,7 +82,7 @@ export function PriorityRankWidget({ districtId }: PriorityRankWidgetProps) {
                       Owner · {action.recommended_owner}
                    </span>
                     <span className="px-1.5 py-0.5 rounded bg-secondary/60 border border-border/40">
-                      SLA · {action.sla_hours} h
+                      Complete within {action.sla_hours} hours
                    </span>
                  </div>
                </div>

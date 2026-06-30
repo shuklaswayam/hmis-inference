@@ -28,9 +28,9 @@ export default function HealthCommissionerDashboard() {
   return (
     <section className="animate-fade-in space-y-6">
       <PageHeader
-        eyebrow="Inference"
+        eyebrow="Daily Briefing"
         title="Health Commissioner Dashboard"
-        description="Four workstreams, refreshed every 15 minutes. The dashboard reads through Redis with a 15-minute TTL, audited in inference_audit."
+        description="Today's view of outbreaks, hospital pressure, and priority actions. Updates every 15 minutes."
         actions={
           <span
             className={
@@ -57,11 +57,11 @@ export default function HealthCommissionerDashboard() {
           className="h-8 px-2 rounded border border-border/80 bg-card text-[12px] text-foreground outline-none focus:border-accent"
         >
           <option value="">All Gujarat</option>
-          <option value="Ahmedabad">Ahmedabad</option>
-          <option value="Surat">Surat</option>
-          <option value="Vadodara">Vadodara</option>
-          <option value="Rajkot">Rajkot</option>
-          <option value="Bhavnagar">Bhavnagar</option>
+          <option value="b663e6d9-bcb9-488d-9625-12d882bf06a0">Ahmedabad</option>
+          <option value="cadc66f3-2937-4015-84d8-4b51981e696e">Surat</option>
+          <option value="123287fb-a1db-443f-9cdf-ee5fbb8e8e99">Vadodara</option>
+          <option value="83bcb628-4b2f-465d-b419-c5262320055b">Rajkot</option>
+          <option value="3515b643-184f-48aa-ba7d-0997b7ae2d53">Bhavnagar</option>
       </select>
         <select
           value={diseaseName ?? ''}
@@ -75,7 +75,7 @@ export default function HealthCommissionerDashboard() {
           <option value="Diarrheal">Diarrheal</option>
       </select>
         <span className="ml-auto text-[10px] text-muted-foreground">
-          Cache TTL = 15 min · audited · live SSE
+          Updates every 15 minutes
       </span>
     </Card>
 
