@@ -32,7 +32,7 @@ client.interceptors.request.use((config) => {
       config.headers = config.headers ?? {}
       config.headers.Authorization = `Bearer ${tok}`
     }
-  } catch (_) {
+  } catch {
     // localStorage may not be available (SSR / test); ignore.
   }
   return config
@@ -55,7 +55,7 @@ client.interceptors.response.use(undefined, (error) => {
     window.localStorage.removeItem('hmis:auth:refresh')
     window.localStorage.removeItem('hmis:auth:user')
     window.dispatchEvent(new CustomEvent('hmis:auth:expired'))
-  } catch (_) {
+  } catch {
     // ignore — the worst case is the user sees the original error
   }
   return Promise.reject(error)

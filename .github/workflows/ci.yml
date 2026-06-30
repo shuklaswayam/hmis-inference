@@ -30,7 +30,7 @@ jobs:
             hmis-inference/requirements.txt
             hmis-inference/requirements-dev.txt
       - name: Install dependencies
-        run: pip install --no-cache-dir -r requirements-dev.txt
+        run: pip install -r requirements-dev.txt
       - name: Run tests
         env:
           PYTHONPATH: ${{ github.workspace }}/hmis-inference
