@@ -293,7 +293,7 @@ I'll use a "permit-to-build" sequence — each pass closes a slice that's testab
 - Frontend refresh: 5 min default; the memo panel's Regenerate bypasses cacheclient-side.
 r
 ---
-9. What this delivers against the premise
+9. What this delivers against the premise is
 
 ┌─────────────────────────────────────────────────────────────────────────────────────────────┬────────────────────────────────────────────────────────┐
 │                                       Premise clause                                        │                      Delivered by                      │
