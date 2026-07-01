@@ -149,6 +149,7 @@ def fastapi_client(mock_db, mock_redis):
         "backend._legacy.alerts",
         "backend._legacy.insights",
         "backend._legacy.qa",
+        "backend.routers.analytics",
         "backend.routers.districts",
         "backend.routers.drilldown",
         "backend.routers.facilities",
@@ -159,6 +160,14 @@ def fastapi_client(mock_db, mock_redis):
     with ExitStack() as stack:
         for module in router_modules:
             stack.enter_context(patch(f"{module}.Database", mock_db))
+        # Patch redis_client on modules that create their own aioredis connections
+        # so tests don't need a running Redis instance.
+        redis_modules = (
+            "backend.routers.analytics",
+            "backend._legacy.alerts",
+        )
+        for module in redis_modules:
+            stack.enter_context(patch(f"{module}.redis_client", mock_redis))
         from fastapi.testclient import TestClient
         from backend.main import app
         yield TestClient(app)
