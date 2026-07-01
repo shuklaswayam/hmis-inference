@@ -291,7 +291,7 @@ I'll use a "permit-to-build" sequence — each pass closes a slice that's testab
 - Audit volume: expected ≤ ~5k rows / week with the 15-min cadence. Table is append-only with (workstream, generated_at DESC) index — no partitioning needed in scope.
 - Auth: keep the existing optional APIKeyGate — /api/v1/inference/* falls under its blanket.
 - Frontend refresh: 5 min default; the memo panel's Regenerate bypasses cacheclient-side.
-
+r
 ---
 9. What this delivers against the premise
 
