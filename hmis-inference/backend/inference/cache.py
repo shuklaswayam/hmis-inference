@@ -93,14 +93,16 @@ async def invalidate(cache_key: str) -> None:
         logger.debug("cache invalidate failed for %s", cache_key, exc_info=True)
 
 
-def make_key(workstream: str, params: dict[str, Any]) -> str:
+def make_key(workstream: str, params: dict[str, Any], *, version: str = "v1") -> str:
     """Stable Redis key for a workstream call.
 
     ``params`` is hashed so we don't leak unbounded user-supplied text
-    into key names.
+    into key names.  ``version`` lets us invalidate stale payloads
+    without bouncing Redis (e.g. ``policy_memo`` uses ``v2`` after the
+    rich-description enrichment).
     """
     import hashlib
 
     raw = "&".join(f"{k}={params[k]}" for k in sorted(params))
     h = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
-    return f"inf:{workstream}:v1:{h}"
+    return f"inf:{workstream}:{version}:{h}"

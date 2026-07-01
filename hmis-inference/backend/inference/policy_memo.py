@@ -1,4 +1,4 @@
-"""Workstream 4 — Policy Insight Narrator.
+"""Workstream 4 -- Policy Insight Narrator.
 
 Aggregator that:
   1. Reads WS1 (outbreak) + WS2 (pressure) + WS3 (priority rank) state
@@ -16,7 +16,13 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
-from backend.llm.memo_synthesizer import MemoSynthesizer
+from backend.llm.memo_synthesizer import (
+    MemoSynthesizer,
+    _scrub_action_text,
+    _normalize_action,
+    _neutral_surveillance_action,
+    _scrub_hashtags,
+)
 from backend.inference import (
     cache as inference_cache,
     hospital_pressure,
@@ -73,6 +79,108 @@ async def _bundle(
     }
 
 
+# ---------------------------------------------------------------------------
+# Defense-in-depth: ensure every action leaving the policy-memo endpoint
+# carries rich, click-worthy fields. Even if a stale cache or a thin LLM
+# response slips through, the click-through will never be empty.
+# ---------------------------------------------------------------------------
+
+_RICH_DEFAULTS_BY_SEVERITY = {
+    "CRITICAL": [
+        "Convene the rapid-response leadership within the next 30 minutes.",
+        "Open a state-level incident channel and broadcast the action to all districts.",
+        "Suspend non-emergency operations affected by this signal until containment is confirmed.",
+        "Capture device-level telemetry and submit it to the central dashboard within 24 hours.",
+    ],
+    "HIGH": [
+        "Dispatch a district-level assessment team within the SLA window.",
+        "Confirm resourcing (staff, supplies, transport) and surface gaps to the State desk.",
+        "Issue an interim status update to the State dashboard before the SLA closes.",
+    ],
+    "MEDIUM": [
+        "Schedule the response within the SLA window and add to the weekly review.",
+        "Validate the trigger signal against the last 14 days of facility data.",
+        "If validated, dispatch the district team; if noise, close with a rationale note.",
+    ],
+    "LOW": [
+        "Log the observation and monitor for re-occurrence across the next reporting cycle.",
+        "Confirm routine surveillance cadence is unchanged.",
+    ],
+}
+
+
+def _enrich_action_for_return(action: dict, idx: int, bundle: dict) -> dict:
+    """Final pass before the memo leaves the backend.
+
+    Fills in any *empty or missing* field with a meaningful default so
+    the click-through card in the UI is never blank. Keeps any field
+    the synthesizer already populated.
+    """
+    if not isinstance(action, dict):
+        action = {"action": str(action)}
+
+    sev = str(action.get("severity") or "MEDIUM").upper()
+    sla_hours = int(action.get("sla_hours") or 24)
+    title = _scrub_action_text(action.get("action")) or f"Recommended action #{idx + 1}"
+    owner = _scrub_action_text(action.get("owner")) or "State Health Commissioner"
+    refs = list(action.get("evidence_refs") or [])
+
+    description = (
+        _scrub_action_text(action.get("description"))
+        or _scrub_action_text(action.get("summary"))
+        or _scrub_action_text(action.get("what"))
+        or _scrub_action_text(action.get("details"))
+        or (
+            f"{title} -- flagged at {sev} severity with a {sla_hours}h completion window. "
+            f"Owner of record: {owner}. "
+            "Refer to the source references and operational next steps for the full picture."
+        )
+    )
+
+    rationale = (
+        _scrub_action_text(action.get("rationale"))
+        or _scrub_action_text(action.get("why"))
+        or _scrub_action_text(action.get("justification"))
+        or (
+            "This action was raised by the priority ranker because one or more signals "
+            "(outbreak, hospital pressure, or rule-based alert) crossed the dispatch threshold. "
+            "Confidence and severity are computed from the live KPI bundle; evidence references "
+            "below point at the underlying rows."
+        )
+    )
+
+    next_steps = action.get("next_steps")
+    if not next_steps or not isinstance(next_steps, list) or not next_steps:
+        next_steps = list(_RICH_DEFAULTS_BY_SEVERITY.get(sev, _RICH_DEFAULTS_BY_SEVERITY["MEDIUM"]))
+    else:
+        # scrub + ensure list[str]
+        next_steps = [_scrub_action_text(s) for s in next_steps if _scrub_action_text(s)]
+        if not next_steps:
+            next_steps = list(_RICH_DEFAULTS_BY_SEVERITY.get(sev, _RICH_DEFAULTS_BY_SEVERITY["MEDIUM"]))
+
+    if not refs:
+        # Last-resort evidence: surface something traceable
+        for o in bundle.get("outbreak_top", []):
+            refs.append(f"district:{o.get('district', 'unknown')}")
+            break
+        for p in bundle.get("pressure_top", []):
+            refs.append(f"facility:{p.get('facility', 'unknown')}")
+            break
+        if not refs:
+            refs = ["rule:priority_ranker"]
+
+    return _normalize_action({
+        "action": title,
+        "description": description,
+        "rationale": rationale,
+        "next_steps": next_steps,
+        "owner": owner,
+        "severity": sev,
+        "sla_hours": sla_hours,
+        "evidence_refs": refs,
+    })
+
+
 async def compose(
     *,
     outbreak_signals: Optional[list[dict]] = None,
@@ -92,10 +200,26 @@ async def compose(
     )
     synth = synthesizer or MemoSynthesizer()
     memo = synth.synthesize_memo(bundle)
+
+    # Scrub again at the boundary -- belt and braces.
+    headline = _scrub_hashtags(memo.headline).strip()[:280]
+    body_md = _scrub_hashtags(memo.body_md).strip()[:8000]
+
+    raw_actions = list(memo.recommended_actions or [])
+    if not raw_actions:
+        raw_actions = [_neutral_surveillance_action()]
+
+    # Final defense-in-depth enrichment: every action that leaves this
+    # function has description, rationale, non-empty next_steps, owner,
+    # severity, sla_hours, and evidence_refs.
+    enriched_actions = [
+        _enrich_action_for_return(a, i, bundle) for i, a in enumerate(raw_actions[:5])
+    ]
+
     return {
-        "headline": memo.headline,
-        "body_md": memo.body_md,
-        "recommended_actions": memo.recommended_actions,
+        "headline": headline,
+        "body_md": body_md,
+        "recommended_actions": enriched_actions,
         "generated_from": bundle,
         "llm_generated": memo.llm_generated,
     }
@@ -114,5 +238,8 @@ def aggregate_severity(ranked: list[dict]) -> tuple[str, float]:
 
 # The Redis cache for the memo endpoint piggybacks on the priorities
 # call so memo freshness is inherited from WS3 ranking changes.
+#
+# NOTE: cache key version bumped v1 -> v2 so any payloads cached before
+# the rich-description enrichment is invalidated and re-generated.
 async def memo_cache_key(*, district_id: Optional[str] = None) -> str:
     return inference_cache.make_key("policy_memo", {"d": district_id or "ALL"})

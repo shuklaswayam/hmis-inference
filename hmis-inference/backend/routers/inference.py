@@ -227,7 +227,13 @@ async def get_policy_memo(
     force_refresh: bool = Query(False),
     user: Optional[CurrentUser] = Depends(get_optional_user),
 ):
-    key = inference_cache.make_key("policy_memo", {"d": district_id or "ALL"})
+    # Cache key bumped v1 -> v2: invalidates any payloads cached before
+    # the rich-description enrichment so the dashboard sees rich data ASAP.
+    key = inference_cache.make_key(
+        "policy_memo",
+        {"d": district_id or "ALL"},
+        version="v2",
+    )
 
     async def loader():
         outbreak_signals = await outbreak_risk.score(district_id=district_id)

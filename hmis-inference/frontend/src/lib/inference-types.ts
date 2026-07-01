@@ -64,6 +64,16 @@ export interface MemoAction {
   action: string
   owner: string
   sla_hours: number
+  /** Rich 2-4 sentence description: what is happening, magnitude, and why it matters today */
+  description?: string
+  /** 1-2 sentence justification naming specific evidence and bundle fields */
+  rationale?: string
+  /** 3-6 concrete bullets the owner can execute */
+  next_steps?: string[]
+  severity?: Severity
+  evidence_refs?: string[]
+  /** Optional deep-link to the underlying source data */
+  source_url?: string
 }
 
 export interface PolicyMemoBody {

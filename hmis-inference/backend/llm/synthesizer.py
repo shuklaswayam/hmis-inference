@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import collections
 import json
 import logging
 import os
+import threading
+import time
 from typing import Any, TYPE_CHECKING
 
 import httpx
@@ -11,6 +14,37 @@ if TYPE_CHECKING:
     from groq import Groq
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Rate limiter: keep requests under the 40 RPM ceiling (default 36 RPM)
+# ---------------------------------------------------------------------------
+
+
+class _RateLimiter:
+    """Thread-unsafe per-process rate limiter for LLM calls."""
+
+    def __init__(self, max_rpm: float = 34.0) -> None:
+        self._max_rpm = max_rpm
+        self._timestamps: collections.deque[float] = collections.deque()
+        self._lock = threading.Lock()
+
+    def acquire(self) -> None:
+        """Block until it is safe to issue the next request."""
+        with self._lock:
+            now = time.monotonic()
+            # prune timestamps older than 60 s
+            cutoff = now - 60.0
+            while self._timestamps and self._timestamps[0] < cutoff:
+                self._timestamps.popleft()
+            if len(self._timestamps) >= self._max_rpm:
+                sleep_for = self._timestamps[0] - cutoff
+                if sleep_for > 0:
+                    time.sleep(sleep_for)
+                    now = time.monotonic()
+            self._timestamps.append(now)
+
+
+_rate_limiter = _RateLimiter()
 
 SYSTEM_PROMPT = """\
 You are a public health analytics assistant for India's HMIS. \
@@ -112,6 +146,7 @@ class LLMSynthesizer:
         return True  # ollama is "ready"; failures surface per-call
 
     def _call_ollama(self, prompt: str, system_prompt: str = SYSTEM_PROMPT) -> str:
+        _rate_limiter.acquire()
         payload = {
             "model": self._ollama_model,
             "prompt": prompt,
@@ -133,6 +168,7 @@ class LLMSynthesizer:
     def _call_groq(
         self, prompt: str, system_prompt: str = SYSTEM_PROMPT
     ) -> str:
+        _rate_limiter.acquire()
         if self._init_error is not None:
             raise self._init_error
         if self._groq_client is None:

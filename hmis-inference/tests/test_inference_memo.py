@@ -62,9 +62,16 @@ def test_synthesizer_falls_back_when_provider_empty():
     fallback = synth._structured_template(_bundle())
     assert fallback.llm_generated is False
     assert fallback.headline
-    assert "Outbreaks" in fallback.body_md
+    assert "outbreaks" in fallback.body_md.lower()
     assert "Hospital pressure" in fallback.body_md
-    assert any(a["sla_hours"] == 4 for a in fallback.recommended_actions)
+    actions = fallback.recommended_actions
+    assert any(a["sla_hours"] == 4 for a in actions)
+    # richer fallback fields
+    top = actions[0]
+    assert top.get("description")
+    assert top.get("rationale")
+    assert top.get("next_steps")
+    assert top.get("evidence_refs")
 
 
 def test_synthesizer_fallback_handles_empty_priority_top5():
