@@ -31,6 +31,10 @@ import {
   CommandSeparator
 } from '@/components/ui/command'
 
+type NavItem = { label: string; to: string; icon: typeof Sparkles }
+type ActionItem = { label: string; action: string; icon: typeof Sparkles; shortcut?: string }
+type CommandItemData = NavItem | ActionItem
+
 interface AiCommandBarProps {
   onSubmit?: (prompt: string) => void
   placeholder?: string
@@ -144,7 +148,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     }
   }
 
-  const items = [
+  const items: { group: string; items: CommandItemData[] }[] = [
     {
       group: 'Navigation',
       items: [
@@ -205,7 +209,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                   <CommandItem
                     key={it.label}
                     value={it.label}
-                    onSelect={() => handleSelect(it.to, it.action)}
+                    onSelect={() => handleSelect('to' in it ? it.to : undefined, 'action' in it ? it.action : undefined)}
                     className="flex items-center gap-3 px-3 py-2 rounded-md transition-all duration-75 cursor-pointer data-[selected=true]:bg-accent/10 data-[selected=true]:text-foreground outline-none"
                   >
                     <motion.div
@@ -221,7 +225,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                     >
                       <Icon className="h-3.5 w-3.5 text-muted-foreground group-data-[selected=true]:text-accent transition-colors" />
                       <span className="flex-1 text-body-sm tracking-tight">{it.label}</span>
-                      {it.shortcut && (
+                      {'shortcut' in it && it.shortcut && (
                         <kbd className="text-[9px] font-mono text-muted-foreground opacity-80 border border-border/40 px-1 py-0.5 rounded bg-secondary/50">
                           {it.shortcut}
                         </kbd>
