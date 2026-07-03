@@ -44,45 +44,41 @@ Absolute rules — non-negotiable:
   propose something absent from that list.
 - Each action carries a single owner, a severity, and an SLA in hours.
   Owners come from the dispatch table supplied; do not propose new ones.
-- Markdown formatting in body_md only. No HTML.
 - Plain English; avoid jargon and boilerplate phrases like
   "comprehensive", "robust", "ensure holistic", "stakeholder synergy".
 
-CLEAN-OUTPUT RULES — these are enforced:
+CLEAN-OUTPUT RULES — these are strictly enforced:
 - NEVER use social-media style hashtags. Do not write inline tokens
-  like "#dengue", "#outbreak", "#gujarat" anywhere in body_md or in
-  any action field. Zero hashtags of any kind.
-- NEVER include Twitter / Slack / editorial hash-tags such as
-  #breaking, #urgent, #health, #publichealth. These are forbidden.
-- Use clean markdown headers only: ## for section titles, ### for
-  sub-section titles. Do NOT prefix words with # for stylistic
-  emphasis. Bold (**) and italic (*) are allowed, lists (- / 1.) are
-  allowed, plain prose is allowed.
-- Do NOT use emoji. Do NOT use decorative separators like --- or ***.
-- Tables are welcome when they help the reader (e.g. listing facility /
-  ICU / bed numbers side by side).
+  like "#dengue", "#outbreak", "#gujarat" anywhere. Zero hashtags of any kind.
+- NEVER include Twitter / Slack / editorial hashtags such as
+  #breaking, #urgent, #health, #publichealth.
+- NEVER use `#` (hashtag or header marker) or `*` (asterisk) characters anywhere in the body_md.
+- DO NOT use markdown headers (no `#` or `##` or `###`). For section headings, write the heading title in plain text on its own line (e.g. "Active outbreaks" or "Hospital pressure").
+- DO NOT use markdown bold or italic formatting (no `**` or `*`).
+- DO NOT use bulleted lists using asterisks `*`. Use simple dashes `-` for lists.
+- DO NOT use markdown tables (no `|` or `-` table separator lines). Use simple plain-text sentences or bulleted lists using dashes `-`.
+- DO NOT use emoji. DO NOT use decorative separators.
 - Numbers must be quoted with their unit (% for percentages, "cases"
   for case counts, "x" for ratios, "h" for hours).
 
-body_md structure — produce FIVE sections, in this exact order, with
-these exact headings:
-  ## At a glance
+body_md structure — produce FIVE sections, in this exact order, with these exact heading titles on their own line without any leading/trailing symbols (like # or *):
+  At a glance
     One sentence, max 35 words, naming the single most important
     thing the Commissioner should know today.
-  ## Active outbreaks
-    Either a short markdown table OR a bulleted list of every entry
-    in outbreak_top. Each row: district, disease, tier, confidence,
-    14-day case count, baseline ratio, why it matters in one line.
-  ## Hospital pressure
-    Same pattern for pressure_top. Each row: facility, district, tier,
-    current ICU%, bed%, projected 48h ICU%, projected 48h bed%, trend
-    arrow (rising / stable / easing), one-line reason.
-  ## Cross-cutting signals
+  Active outbreaks
+    A bulleted list using dashes `-` (and no asterisks or hashtags) of every entry
+    in outbreak_top. Each bullet: district, disease, tier, confidence,
+    14-day case count, baseline ratio, why it matters.
+  Hospital pressure
+    A bulleted list using dashes `-` of every entry in pressure_top.
+    Each bullet: facility, district, tier, current ICU%, bed%, projected 48h ICU%,
+    projected 48h bed%, trend arrow (rising / stable / easing), one-line reason.
+  Cross-cutting signals
     2–4 sentences summarising patterns across the bundle (e.g. "ICU
     pressure clustered in two districts correlates with the dengue
     surge there"). Use the bundle to support every statement.
-  ## Top 5 priority actions
-    A numbered list 1–5 mirroring priority_top5 by rank. For each
+  Top 5 priority actions
+    A numbered list 1-5 mirroring priority_top5 by rank. For each
     action give: the headline, severity (CRITICAL/HIGH/MEDIUM/LOW),
     owner, SLA in hours, evidence_refs joined by commas, and a 1-line
     summary of what to do.
@@ -94,13 +90,12 @@ vague filler; every sentence should carry information.
 Output JSON with exactly these keys:
 {
   "headline": str,                         // <= 110 chars, declarative
-  "body_md":  str,                         // markdown, 450-750 words
+  "body_md":  str,                         // plain text with dashes for lists, 450-750 words
   "recommended_actions": [
     {
       "action":          str,              // short, verb-led title
                                            //   e.g. "Activate dengue
                                            //   containment in Ahmedabad"
-                                           //   appears bolded in UI
       "description":     str,              // 2-4 sentences: WHAT is
                                            //   happening, the magnitude
                                            //   (numbers), and WHY it
@@ -221,6 +216,28 @@ _CATCHALL_HASHTAG_RE = re.compile(
 # Collapse multiple consecutive blank lines.
 _MULTIBLANK_RE = re.compile(r"\n{3,}")
 
+# Stray markdown bold markers that LLM outputs sometimes leak into body text.
+# `**bold**` becomes `bold` rather than rendering as literal asterisks.
+_BOLD_MARKER_RE = re.compile(r"\*+([^*\n]+?)\*+")
+
+# Feature-label refs in the form `district:Vadodara`, `rule:outbreak_critical`,
+# `facility:<uuid>`. They render as comma-separated noise in the body and look
+# like random hashtags to the reader. We humanize them into clean prose.
+_FEATURE_LABEL_REF_RE = re.compile(
+    r"\b(district|rule|facility|disease|tier|severity|kpi)\s*:\s*"
+    r"([A-Za-z0-9_\-./]+(?:\s+[A-Za-z0-9_\-./]+)*)"
+)
+
+_LABEL_PRETTY = {
+    "district":  "district",
+    "rule":      "rule",
+    "facility":  "facility",
+    "disease":   "disease",
+    "tier":      "tier",
+    "severity":  "severity",
+    "kpi":       "kpi",
+}
+
 
 def _scrub_hashtags(text: str) -> str:
     """Strip social-media style hashtags from LLM output.
@@ -235,6 +252,51 @@ def _scrub_hashtags(text: str) -> str:
     text = _HASHTAG_RE.sub("", text)
     text = _CATCHALL_HASHTAG_RE.sub("", text)
     # Collapse stray blank lines left by removal.
+    text = _MULTIBLANK_RE.sub("\n\n", text)
+    return text.strip()
+
+
+def _humanize_feature_labels(text: str) -> str:
+    """Rewrite `key:value` evidence labels into clean prose.
+
+    `district:Vadodara, rule:outbreak_critical, facility:<uuid>` becomes
+    `district Vadodara, rule outbreak_critical, facility <uuid>`. This
+    removes the colon-noise that visually reads as hashtags while
+    preserving the underlying info.
+    """
+    if not text:
+        return text
+
+    def _replace(match: re.Match[str]) -> str:
+        key = match.group(1).lower()
+        value = match.group(2).strip()
+        pretty = _LABEL_PRETTY.get(key, key)
+        return f"{pretty} {value}"
+
+    return _FEATURE_LABEL_REF_RE.sub(_replace, text)
+
+
+def _scrub_markdown_stars(text: str) -> str:
+    """Strip stray `**` markdown bold markers.
+
+    The Commissioner's memo is rendered as plain text in the dashboard
+    panel. If an LLM emits `**bold**` it shows as literal asterisks and
+    reads as random noise. Convert `**word**` -> `word`.
+    """
+    if not text:
+        return text
+    return _BOLD_MARKER_RE.sub(r"\1", text)
+
+
+def _scrub_body_noise(text: str) -> str:
+    """Combined scrubber for memo body output: hashtags + bold stars + labels."""
+    if not text:
+        return text
+    text = _scrub_hashtags(text)
+    text = _humanize_feature_labels(text)
+    text = _scrub_markdown_stars(text)
+    text = text.replace('#', '')
+    text = text.replace('*', '')
     text = _MULTIBLANK_RE.sub("\n\n", text)
     return text.strip()
 
@@ -404,11 +466,12 @@ class MemoSynthesizer:
             raw = self._call_llm(prompt)
             data = self._parse(raw)
             return MemoResult(
-                # Scrub ALL fields, not just body_md — social-media hashtags
-                # in the headline or in any action field would surface
-                # unmodified otherwise.
-                headline=_scrub_hashtags(str(data.get("headline", "")).strip())[:280],
-                body_md=_scrub_hashtags(str(data.get("body_md", "")).strip())[:8000],
+                # Scrub ALL fields, not just body_md — social-media hashtags,
+                # stray markdown bold markers, and feature-label noise
+                # (`district:X, rule:Y`) in the headline or in any action
+                # field would surface unmodified otherwise.
+                headline=_scrub_body_noise(str(data.get("headline", "")).strip())[:280],
+                body_md=_scrub_body_noise(str(data.get("body_md", "")).strip())[:8000],
                 recommended_actions=[
                     _normalize_action(a) for a in data.get("recommended_actions", [])
                 ][:5],
@@ -501,29 +564,23 @@ class MemoSynthesizer:
 
         # -- At a glance
         if actions:
-            body_parts.append("## At a glance")
+            body_parts.append("At a glance")
             body_parts.append(
                 _scrub_hashtags(_glance_sentence(outbreaks, pressures, actions)) + "\n"
             )
         else:
-            body_parts.append("## At a glance")
+            body_parts.append("At a glance")
             body_parts.append(
                 "No outbreak, hospital-pressure, or ranked signals "
                 "warrant director-level intervention today.\n"
             )
 
         # -- Outbreaks
-        body_parts.append("## Active outbreaks")
+        body_parts.append("Active outbreaks")
         if outbreaks:
-            body_parts.append(
-                "| District | Disease | Tier | Confidence | 14-day cases | Baseline ratio | Why it matters |"
-            )
-            body_parts.append(
-                "| --- | --- | --- | --- | --- | --- | --- |"
-            )
             for o in outbreaks:
                 body_parts.append(
-                    "| {district} | {disease} | {tier} | {conf:.2f} | {cases} | {ratio}x | {why} |".format(
+                    "- {district} - {disease}: {tier} tier, {conf:.2f} confidence. 14-day cases: {cases}. Baseline ratio: {ratio}x. Note: {why}".format(
                         district=_scrub_hashtags(str(o.get("district", "-"))),
                         disease=_scrub_hashtags(str(o.get("disease", "-"))),
                         tier=_scrub_hashtags(str(o.get("tier", "-"))),
@@ -535,21 +592,15 @@ class MemoSynthesizer:
                 )
         else:
             body_parts.append(
-                "No (district, disease) bucket has crossed the medium "
-                "tier in the last 14 days.\n"
+                "No outbreaks have crossed the threshold in the last 14 days.\n"
             )
 
         # -- Pressure
-        body_parts.append("\n## Hospital pressure")
+        body_parts.append("\nHospital pressure")
         if pressures:
-            body_parts.append(
-                "| Facility | District | Tier | ICU | Bed | ICU +48h | Bed +48h | Trend | Note |"
-            )
-            body_parts.append("| --- | --- | --- | --- | --- | --- | --- | --- | --- |")
             for p in pressures:
                 body_parts.append(
-                    "| {facility} | {district} | {tier} | {icu}% | {bed}% | "
-                    "{icu48}% | {bed48}% | {trend} | {note} |".format(
+                    "- {facility} ({district}): {tier} tier. ICU occupancy: {icu}%, Bed occupancy: {bed}%. Projected 48h ICU: {icu48}%, Bed: {bed48}%. Trend: {trend}. Note: {note}".format(
                         facility=_scrub_hashtags(str(p.get("facility", "-"))),
                         district=_scrub_hashtags(str(p.get("district", "-"))),
                         tier=_scrub_hashtags(str(p.get("tier", "-"))),
@@ -563,20 +614,20 @@ class MemoSynthesizer:
                 )
         else:
             body_parts.append(
-                "No facility is over the strained threshold.\n"
+                "No facility is currently over the strained threshold.\n"
             )
 
         # -- Cross-cutting
-        body_parts.append("\n## Cross-cutting signals")
+        body_parts.append("\nCross-cutting signals")
         body_parts.append(_scrub_hashtags(_cross_cutting(outbreaks, pressures, actions)) + "\n")
 
         # -- Top 5 priority actions (overview)
-        body_parts.append("\n## Top 5 priority actions")
+        body_parts.append("\nTop 5 priority actions")
         if actions:
             for a in actions:
                 refs = ", ".join([_scrub_hashtags(str(x)) for x in (a.get("evidence_refs", []) or [])])
                 body_parts.append(
-                    "{rank}. **{headline}** -- severity {sev}, "
+                    "{rank}. {headline} - severity {sev}, "
                     "owner {owner}, SLA {sla}h. "
                     "Evidence: {refs}.".format(
                         rank=a.get("rank", "?"),
@@ -589,7 +640,7 @@ class MemoSynthesizer:
                 )
         else:
             body_parts.append(
-                "1. **Continue routine surveillance** -- severity LOW, "
+                "1. Continue routine surveillance - severity LOW, "
                 "owner District Surveillance Officer, SLA 72h. Evidence: n/a."
             )
 
@@ -611,8 +662,8 @@ class MemoSynthesizer:
             recommended.append(_neutral_surveillance_action())
 
         return MemoResult(
-            headline=_scrub_hashtags(headline)[:280],
-            body_md=_scrub_hashtags(body_md)[:8000],
+            headline=_scrub_body_noise(headline)[:280],
+            body_md=_scrub_body_noise(body_md)[:8000],
             recommended_actions=recommended,
             llm_generated=False,
         )
@@ -645,7 +696,7 @@ def _glance_sentence(
     if actions:
         top = actions[0]
         parts.append(
-            f"**{top.get('headline', 'Top priority')}** "
+            f"{top.get('headline', 'Top priority')} "
             f"({top.get('severity', 'HIGH')} severity, owner: "
             f"{top.get('recommended_owner', 'State')}, SLA "
             f"{int(top.get('sla_hours', 24))}h)."
@@ -669,7 +720,7 @@ def _cross_cutting(
     overlap = districts_with_outbreaks & districts_with_pressure
     if overlap:
         parts.append(
-            f"**Disease–capacity overlap:** {', '.join(sorted(overlap))} show "
+            f"Disease–capacity overlap: {', '.join(sorted(overlap))} show "
             f"both outbreak signals and hospital pressure. Coordinated response is advised."
         )
     if outbreaks and not pressures:

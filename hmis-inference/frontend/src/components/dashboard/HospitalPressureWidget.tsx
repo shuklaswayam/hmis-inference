@@ -104,13 +104,29 @@ export function HospitalPressureWidget({ districtId, facilityId }: HospitalPress
                   <span>Bed {s.bed_occupancy_pct.toFixed(0)}%</span>
                   <span className="inline-flex items-center gap-1">
                     {trendIcon(s.trend_48h)}
-                    {s.trend_48h === 'rising' ? 'getting worse' : s.trend_48h === 'easing' ? 'easing' : 'steady'}
+                    <span className={cn(
+                      s.trend_48h === 'rising' ? 'text-destructive font-medium' :
+                      s.trend_48h === 'easing' ? 'text-success font-medium' :
+                      'text-muted-foreground'
+                    )}>
+                      {s.trend_48h === 'rising'
+                        ? 'Worsening over 48 h'
+                        : s.trend_48h === 'easing'
+                        ? 'Improving over 48 h'
+                        : 'Holding steady'}
+                    </span>
+                    {s.projection_available && s.trend_confidence > 0 ? (
+                      <span className="text-[9px] text-muted-foreground/60 ml-0.5">
+                        ({(s.trend_confidence * 100).toFixed(0)}% confidence)
+                      </span>
+                    ) : null}
                  </span>
                </div>
                 {s.icu_pred_48h != null ? (
-                  <p className="text-[11px] text-muted-foreground/80 mt-0.5">
-                    Expected in 48 hours · ICU {s.icu_pred_48h.toFixed(0)}% · beds {s.bed_pred_48h?.toFixed(0) ?? '—'}%
-                 </p>
+                  <p className="text-[11px] text-muted-foreground/80 mt-0.5 inline-flex items-center gap-1">
+                    <span className="text-[9px] font-semibold uppercase tracking-wider text-primary/70 bg-primary/10 rounded px-1 py-0.5">AI 48 h</span>
+                    ICU {s.icu_pred_48h.toFixed(0)}% · beds {s.bed_pred_48h?.toFixed(0) ?? '—'}%
+                  </p>
                 ) : null}
              </div>
            </li>

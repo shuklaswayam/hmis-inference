@@ -77,6 +77,7 @@ class FacilityLoadProjection:
     horizon_days: int
     series: list[dict]            # [{ds, icu_yhat, bed_yhat, ...}]
     trend: str                    # "rising" / "stable" / "easing"
+    trend_confidence: float       # 0.0–1.0, from prediction-interval overlap
     icu_pred_24h: float
     icu_pred_48h: float
     bed_pred_48h: float
@@ -104,9 +105,9 @@ class FacilityLoadForecaster:
         icu_series: pd.DataFrame,
         bed_series: pd.DataFrame,
         *,
-        horizon_days: int = 2,
+        horizon_days: int = 5,
     ) -> FacilityLoadProjection:
-        """Fit two Projhet models and return their forward projection.
+        """Fit two Prophet models and return their forward projection.
 
         ``icu_series`` and ``bed_series`` must each contain columns
         ``ds`` (Timestamp-like) and ``y`` (float, percentage 0-100).
@@ -118,21 +119,74 @@ class FacilityLoadForecaster:
         icu_fc = self._tail(icu_model, horizon_days)
         bed_fc = self._tail(bed_model, horizon_days)
 
-        # Trend classification: rising if most-recent yhat > first yhat
-        # by >= 2 percentage points (over the horizon); easing if it
-        # drops by >= 2; otherwise stable. Use ``.iloc[i]`` so we read
-        # rows positionally — ``df[i]`` is a column lookup and breaks
-        # against Prophet's frame (KeyError: 0).
+        # ── Composite trend from both ICU and bed predictions ──────────
+        # Weight ICU more heavily (0.6) since it's the primary pressure signal.
         icu_first = float(icu_fc.iloc[0]["yhat"])
         icu_last = float(icu_fc.iloc[-1]["yhat"])
-        if icu_last - icu_first >= 2.0:
+        bed_first = float(bed_fc.iloc[0]["yhat"])
+        bed_last = float(bed_fc.iloc[-1]["yhat"])
+        icu_delta = icu_last - icu_first
+        bed_delta = bed_last - bed_first
+        composite_delta = 0.6 * icu_delta + 0.4 * bed_delta
+
+        # ±3pp threshold: smaller swings are routine daily variation and
+        # should not be called a meaningful trend for clinical decision-making.
+        if composite_delta >= 3.0:
             trend = "rising"
-        elif icu_first - icu_last >= 2.0:
+        elif composite_delta <= -3.0:
             trend = "easing"
         else:
             trend = "stable"
 
-        # 24h point — pad horizon=2 with one more day for a clean 24h number
+        # ── Trend confidence from prediction-interval overlap ──────────
+        # If the 95% prediction interval at t+horizon overlaps with the
+        # interval at t+0, the trend change is not statistically
+        # distinguishable → lower confidence.
+        icu_hi_first = float(icu_fc.iloc[0]["yhat_upper"])
+        icu_lo_first = float(icu_fc.iloc[0]["yhat_lower"])
+        icu_hi_last = float(icu_fc.iloc[-1]["yhat_upper"])
+        icu_lo_last = float(icu_fc.iloc[-1]["yhat_lower"])
+        bed_hi_first = float(bed_fc.iloc[0]["yhat_upper"])
+        bed_lo_first = float(bed_fc.iloc[0]["yhat_lower"])
+        bed_hi_last = float(bed_fc.iloc[-1]["yhat_upper"])
+        bed_lo_last = float(bed_fc.iloc[-1]["yhat_lower"])
+
+        def _interval_overlap_confidence(
+            delta: float,
+            lo_first: float, hi_first: float,
+            lo_last: float, hi_last: float,
+        ) -> float:
+            """Confidence that the trend direction is real.
+
+            Returns 0.0–1.0.  High when:
+              - the absolute delta is large relative to the combined
+                interval width (signal >> noise), AND
+              - the start/end intervals do not overlap.
+            """
+            abs_delta = abs(delta)
+            combined_width = (hi_first - lo_first) + (hi_last - lo_last)
+            # If intervals overlap, confidence is suppressed.
+            overlap = max(0.0, min(hi_first, hi_last) - max(lo_first, lo_last))
+            if combined_width <= 0:
+                return 0.5
+            # Signal-to-noise ratio: delta vs combined interval half-width.
+            snr = abs_delta / (combined_width / 2.0)
+            # Overlap penalty: full overlap → 0.0, no overlap → 1.0.
+            max_overlap = combined_width / 2.0
+            overlap_factor = 1.0 - (overlap / max_overlap) if max_overlap > 0 else 1.0
+            # Blend SNR-based confidence with overlap factor.
+            raw = min(1.0, snr * 0.6) * 0.5 + overlap_factor * 0.5
+            return max(0.05, min(0.99, round(raw, 3)))
+
+        icu_conf = _interval_overlap_confidence(
+            icu_delta, icu_lo_first, icu_hi_first, icu_lo_last, icu_hi_last,
+        )
+        bed_conf = _interval_overlap_confidence(
+            bed_delta, bed_lo_first, bed_hi_first, bed_lo_last, bed_hi_last,
+        )
+        trend_confidence = round(0.6 * icu_conf + 0.4 * bed_conf, 3)
+
+        # 24h point — pad horizon to at least 2 for a clean 24h number
         icu_pad = self._tail(icu_model, max(horizon_days, 2))
         return FacilityLoadProjection(
             horizon_days=horizon_days,
@@ -149,6 +203,7 @@ class FacilityLoadForecaster:
                 for i in range(len(icu_fc))
             ],
             trend=trend,
+            trend_confidence=trend_confidence,
             icu_pred_24h=float(icu_pad.iloc[1]["yhat"]) if len(icu_pad) >= 2 else float(icu_pad.iloc[0]["yhat"]),
             icu_pred_48h=float(icu_last),
             bed_pred_48h=float(bed_fc.iloc[-1]["yhat"]),

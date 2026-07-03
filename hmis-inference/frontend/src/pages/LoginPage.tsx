@@ -1,13 +1,24 @@
-import { useEffect, useState } from 'react'
-import client from '@/api/client'
-import { AuthProvider, useAuth, type AuthUser } from '@/auth/AuthContext'
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useAuth, type AuthUser } from '@/auth/AuthContext'
 
-interface LoginPageProps {
-  onSuccess?: () => void
+export default function LoginPage() {
+  return (
+    <main
+      role="main"
+      className="flex min-h-screen items-center justify-center bg-background text-foreground"
+    >
+      <CardScaffold>
+        <LoginForm />
+        <Hint />
+     </CardScaffold>
+   </main>
+  )
 }
 
-function LoginForm({ onSuccess }: LoginPageProps) {
+function LoginForm() {
   const { login } = useAuth()
+  const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
@@ -20,7 +31,7 @@ function LoginForm({ onSuccess }: LoginPageProps) {
     setErr(null)
     try {
       await login(email.trim(), password)
-      onSuccess?.()
+      navigate('/', { replace: true })
     } catch (e: any) {
       setErr(e?.message ?? 'login failed')
     } finally {
@@ -78,21 +89,6 @@ function LoginForm({ onSuccess }: LoginPageProps) {
   )
 }
 
-export default function LoginPage({ onSuccess }: LoginPageProps) {
-  return (
-    <AuthProvider>
-      <main
-        role="main"
-        className="flex min-h-screen items-center justify-center bg-background text-foreground"
-      >
-        <CardScaffold>
-          <LoginForm onSuccess={onSuccess} />
-          <Hint />
-       </CardScaffold>
-     </main>
-   </AuthProvider>
-  )
-}
 
 function CardScaffold({ children }: { children: React.ReactNode }) {
   return (

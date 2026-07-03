@@ -232,7 +232,7 @@ async def get_policy_memo(
     key = inference_cache.make_key(
         "policy_memo",
         {"d": district_id or "ALL"},
-        version="v2",
+        version="v3",
     )
 
     async def loader():

@@ -53,12 +53,15 @@ class HospitalPressureSignal(BaseModel):
     facility_name: str
     district_name: str
     tier: Literal["Normal", "Strained", "Critical"]
+    confidence: float = Field(ge=0.0, le=1.0)
     icu_occupancy_pct: float
     bed_occupancy_pct: float
-    icu_pred_24h: float
-    icu_pred_48h: float
-    bed_pred_48h: float
+    icu_pred_24h: float | None = None
+    icu_pred_48h: float | None = None
+    bed_pred_48h: float | None = None
     trend_48h: Literal["rising", "stable", "easing"]
+    trend_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    projection_available: bool = False
     contributing_metrics: list[str]
     recommended_action: str
     one_liner: str

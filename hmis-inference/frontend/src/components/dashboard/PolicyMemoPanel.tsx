@@ -44,6 +44,8 @@ export function PolicyMemoPanel({ districtId, defaultOpen = false }: PolicyMemoP
   const memo = query.data?.data
   const llmGenerated = memo?.llm_generated ?? false
 
+  // Recommendations populate from backend. Sort CRITICAL -> HIGH -> MEDIUM -> LOW
+  // so the Commissioner sees the cards ranked by severity before expanding.
   const actions = useMemo<MemoAction[]>(() => {
     const raw = memo?.recommended_actions ?? []
     return [...raw].sort((a, b) => {
@@ -101,18 +103,18 @@ export function PolicyMemoPanel({ districtId, defaultOpen = false }: PolicyMemoP
           <Sparkles className="h-4 w-4 text-accent shrink-0" />
           <h2 className="text-subheading font-semibold tracking-tight truncate">
             Policy Memo &mdash; Daily Brief
-        </h2>
+         </h2>
           {memo ? (
             <span className="text-caption text-muted-foreground truncate">
               {memo.headline}
-          </span>
+           </span>
           ) : null}
           {llmGenerated ? (
             <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border border-accent/30 bg-accent/10 text-accent">
               AI-drafted
-          </span>
+           </span>
           ) : null}
-      </div>
+       </div>
         <div className="flex items-center gap-2 shrink-0">
           {open ? (
             <>
@@ -123,7 +125,7 @@ export function PolicyMemoPanel({ districtId, defaultOpen = false }: PolicyMemoP
                 aria-label="Regenerate memo"
               >
                 <RotateCcw className="h-3 w-3" />
-            </button>
+             </button>
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); void copyMarkdown() }}
@@ -135,14 +137,14 @@ export function PolicyMemoPanel({ districtId, defaultOpen = false }: PolicyMemoP
                 )}
               >
                 {copied ? 'Copied' : <Copy className="h-3 w-3" />}
-            </button>
+             </button>
             </>
           ) : null}
           <ChevronDown
             className={cn('h-4 w-4 text-muted-foreground transition-transform', open && 'rotate-180')}
           />
-      </div>
-    </button>
+       </div>
+     </button>
 
       <AnimatePresence initial={false}>
         {open ? (
@@ -160,29 +162,29 @@ export function PolicyMemoPanel({ districtId, defaultOpen = false }: PolicyMemoP
                   <div className="h-4 w-2/3 rounded bg-secondary/60 animate-pulse" />
                   <div className="h-4 w-1/2 rounded bg-secondary/60 animate-pulse" />
                   <div className="h-4 w-3/4 rounded bg-secondary/60 animate-pulse" />
-              </div>
+               </div>
               ) : null}
               {query.isError ? (
                 <p className="text-destructive text-[12px]">
                   Memo backend is unavailable. The router will fall back to a structured template in production.
-              </p>
+               </p>
               ) : null}
 
               {memo ? (
                 <>
                   <h3 className="text-heading-sm font-semibold tracking-tight text-foreground">
                     {memo.headline}
-                </h3>
+                 </h3>
                   <article className="prose prose-invert max-w-none text-[13px] leading-relaxed text-foreground/85 whitespace-pre-wrap">
                     {memo.body_md}
-                </article>
+                 </article>
 
                   {actions.length ? (
                     <div>
                       <h4 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
                         <ListChecks className="h-3 w-3" />
                         Recommended Actions ({actions.length})
-                    </h4>
+                     </h4>
                       <ul className="space-y-2">
                         {actions.map((a, i) => {
                           const sev = (a.severity || 'MEDIUM').toUpperCase()
@@ -207,19 +209,19 @@ export function PolicyMemoPanel({ districtId, defaultOpen = false }: PolicyMemoP
                                 <div className="min-w-0 flex-1">
                                   <p className="text-[12.5px] text-foreground font-medium leading-snug">
                                     {a.action}
-                                </p>
+                                 </p>
                                   <p className="text-[10.5px] text-muted-foreground mt-1 flex items-center gap-2 flex-wrap">
                                     <span className={cn(
                                       'inline-block px-1.5 py-0.5 rounded border text-[9px] uppercase tracking-wider font-semibold',
                                       sevCls,
                                     )}>
                                       {sev}
-                                  </span>
+                                   </span>
                                     <span>Owner &middot; {a.owner || 'Unassigned'}</span>
                                     <span>&middot; Complete within {a.sla_hours}h</span>
-                                </p>
-                              </div>
-                            </button>
+                                 </p>
+                               </div>
+                             </button>
 
                               <AnimatePresence initial={false}>
                                 {isOpen ? (
@@ -236,14 +238,14 @@ export function PolicyMemoPanel({ districtId, defaultOpen = false }: PolicyMemoP
                                         <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">
                                           What is happening
                                        </p>
-                                        <p className="leading-relaxed">{a.description || "No description was provided by the generator — refer to evidence refs and next steps below."}</p>
+                                        <p className="leading-relaxed">{a.description}</p>
                                      </div>
 
                                       <div>
                                         <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">
-                                          Why this matters &mdash; Evidence
+                                          Why this matters &mdash; AI rationale
                                        </p>
-                                        <p className="leading-relaxed text-foreground/85">{a.rationale || "No rationale was provided — see evidence refs for the signals driving this action."}</p>
+                                        <p className="leading-relaxed text-foreground/85">{a.rationale}</p>
                                      </div>
 
                                       <div>
@@ -259,41 +261,31 @@ export function PolicyMemoPanel({ districtId, defaultOpen = false }: PolicyMemoP
                                               >
                                                 <ExternalLink className="h-2.5 w-2.5" />
                                                 {ref}
-                                            </span>
+                                             </span>
                                             ))}
                                          </div>
-                                        ) : (
-                                          <p className="leading-relaxed text-foreground/70 italic text-[11px]">
-                                            No source references were attached to this action.
-                                         </p>
-                                        )}
+                                        ) : null}
                                      </div>
 
                                       <div>
                                         <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">
                                           Next steps for the owner
                                        </p>
-                                        {a.next_steps && a.next_steps.length ? (
-                                          <ol className="space-y-1 list-decimal list-inside marker:text-muted-foreground marker:text-[10px]">
-                                            {a.next_steps.map((step, si) => (
-                                              <li key={si} className="leading-relaxed pl-1">{step}</li>
-                                            ))}
-                                         </ol>
-                                        ) : (
-                                          <p className="leading-relaxed text-foreground/70 italic text-[11px]">
-                                            No concrete next steps were provided.
-                                         </p>
-                                        )}
+                                        <ol className="space-y-1 list-decimal list-inside marker:text-muted-foreground marker:text-[10px]">
+                                          {(a.next_steps ?? []).map((step: string, si: number) => (
+                                            <li key={si} className="leading-relaxed pl-1">{step}</li>
+                                          ))}
+                                       </ol>
                                      </div>
-                                 </div>
-                                </motion.div>
+                                   </div>
+                                 </motion.div>
                                 ) : null}
-                            </AnimatePresence>
-                          </li>
+                             </AnimatePresence>
+                           </li>
                           )
                         })}
-                    </ul>
-                  </div>
+                     </ul>
+                   </div>
                   ) : null}
 
                   <p className="text-[10px] text-muted-foreground/70 pt-2 border-t border-border/30">
@@ -302,13 +294,13 @@ export function PolicyMemoPanel({ districtId, defaultOpen = false }: PolicyMemoP
                     {query.data?.generated_at
                       ? new Date(query.data.generated_at).toLocaleString()
                       : 'n/a'}
-                </p>
+                 </p>
                 </>
               ) : null}
-          </div>
-        </motion.div>
+           </div>
+         </motion.div>
         ) : null}
-    </AnimatePresence>
-  </section>
+     </AnimatePresence>
+   </section>
   )
 }

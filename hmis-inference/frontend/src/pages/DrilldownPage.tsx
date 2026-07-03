@@ -64,6 +64,8 @@ interface FacilityDrilldownData {
   z_scores: Record<string, { mean: number; std: number; z_score_latest: number; latest: number }>
   projected_48h: {
     trend: 'rising' | 'stable' | 'easing' | null
+    trend_confidence: number
+    projection_available: boolean
     icu_24h: number | null
     icu_48h: number | null
     bed_48h: number | null

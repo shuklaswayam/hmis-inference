@@ -12,7 +12,10 @@ import {
   ShieldAlert,
   Download,
   Eye,
-  Tv
+  Tv,
+  LayoutDashboard,
+  Activity,
+  Terminal
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
@@ -141,23 +144,14 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     }
   }
 
-  const items: {
-    group: string
-    items: {
-      label: string
-      icon: typeof Navigation // lucide component type; loose to keep diff small
-      to?: string
-      action?: string
-      shortcut?: string
-    }[]
-  }[] = [
+  const items = [
     {
       group: 'Navigation',
       items: [
-        { label: 'Overview Dashboard', to: '/', icon: Navigation },
-        { label: 'Alerts & Outbreaks', to: '/alerts', icon: ShieldAlert },
-        { label: 'Investigations', to: '/investigations', icon: Tv },
-        { label: 'AI Workspace', to: '/ai', icon: Sparkles },
+        { label: 'Overview Dashboard', to: '/', icon: LayoutDashboard },
+        { label: 'Facilities', to: '/facilities', icon: Activity },
+        { label: 'Analytics', to: '/analytics', icon: Terminal },
+        { label: 'Audit Log', to: '/audit', icon: ShieldAlert },
         { label: 'Settings & Config', to: '/settings', icon: Settings },
       ]
     },

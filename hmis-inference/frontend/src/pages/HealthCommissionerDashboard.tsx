@@ -32,18 +32,11 @@ export default function HealthCommissionerDashboard() {
         title="Health Commissioner Dashboard"
         description="Today's view of outbreaks, hospital pressure, and priority actions. Updates every 15 minutes."
         actions={
-          <span
-            className={
-              'text-[10px] tracking-widest px-2 py-0.5 rounded border ' +
-              (status === 'open'
-                ? 'border-success/30 bg-success/10 text-success'
-                : status === 'closed'
-                  ? 'border-destructive/30 bg-destructive/10 text-destructive'
-                  : 'border-border/60 bg-card text-muted-foreground')
-            }
-          >
-            {status === 'open' ? 'live' : status === 'closed' ? 'disconnected' : 'connecting…'}
-         </span>
+          status === 'open' ? (
+            <span className="text-[10px] tracking-widest px-2 py-0.5 rounded border border-success/30 bg-success/10 text-success">
+              live
+            </span>
+          ) : null
         }
       />
 
@@ -82,7 +75,9 @@ export default function HealthCommissionerDashboard() {
       <div className="grid gap-4 lg:grid-cols-2">
         <OutbreakRiskWidget districtId={districtId} diseaseName={diseaseName} />
         <HospitalPressureWidget districtId={districtId} />
-        <PriorityRankWidget districtId={districtId} />
+        <div className="lg:col-span-2">
+          <PriorityRankWidget districtId={districtId} />
+       </div>
      </div>
 
       <PolicyMemoPanel districtId={districtId} />

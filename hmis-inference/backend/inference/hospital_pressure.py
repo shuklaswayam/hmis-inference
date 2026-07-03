@@ -49,6 +49,8 @@ class PressureSignal:
     icu_occupancy_pct: float
     bed_occupancy_pct: float
     trend: str
+    trend_confidence: float
+    projection_available: bool
     proj_48h: dict
     one_liner: str
     recommended_action: str
@@ -156,19 +158,45 @@ async def score(
         # 48-hour projection — best effort; degrade gracefully.
         proj = await _projection(fid) or {}
         trend = proj.get("trend", "stable")
+        trend_confidence = proj.get("trend_confidence", 0.0)
+        projection_available = proj.get("projection_available", False)
         icu24 = proj.get("icu_pred_24h")
         icu48 = proj.get("icu_pred_48h")
         bed48 = proj.get("bed_pred_48h")
 
-        # Confidence: bigger inputs of the rule that fired → higher
-        # confidence. Cap at 0.99 to avoid false certainty.
+        # Confidence: factor in tier distance from boundary, data
+        # completeness, and historical volatility.
+        data_points = proj.get("data_points", 0)
+        volatility = proj.get("volatility_icu", 0.0)
+
+        # Base confidence from how far the metric is from the tier boundary.
         if tier == "Critical":
-            confidence = min(0.99, 0.7 + (icu - 80) / 50.0)
+            base = min(0.99, 0.7 + (icu - 80) / 50.0)
         elif tier == "Strained":
-            confidence = min(0.95, 0.55 + max(icu - 70, bed - 70) / 80.0)
+            base = min(0.95, 0.55 + max(icu - 70, bed - 70) / 80.0)
         else:
-            # Confidence that this *is* Normal: more normal = higher.
-            confidence = min(0.9, 0.5 + (50.0 - icu) / 100.0)
+            base = min(0.9, 0.5 + (50.0 - icu) / 100.0)
+
+        # Data-completeness penalty: fewer data points → less certain.
+        # 14 is the minimum for projection; 30 is the full window.
+        data_quality = min(1.0, data_points / 30.0) if data_points > 0 else 0.3
+        completeness_factor = 0.7 + 0.3 * data_quality
+
+        # Volatility penalty: high stddev → less certain.
+        # Volatility > 15pp is considered very noisy.
+        volatility_factor = max(0.7, 1.0 - volatility / 30.0)
+
+        # Prediction-interval straddling: if the 48h ICU prediction
+        # interval straddles a tier boundary, reduce confidence.
+        icu_lo = proj.get("icu_48h_lower", icu48)
+        icu_hi = proj.get("icu_48h_upper", icu48)
+        straddle_factor = 1.0
+        if icu_lo is not None and icu_hi is not None:
+            for boundary in [80.0, 90.0]:  # Strained/Critical boundaries
+                if icu_lo < boundary < icu_hi:
+                    straddle_factor *= 0.85  # 15% penalty per straddled boundary
+
+        confidence = base * completeness_factor * volatility_factor * straddle_factor
         confidence = round(max(0.05, min(0.99, confidence)), 3)
 
         one_liner = (
@@ -187,6 +215,8 @@ async def score(
                 "icu_occupancy_pct": round(icu, 1),
                 "bed_occupancy_pct": round(bed, 1),
                 "trend_48h": trend,
+                "trend_confidence": trend_confidence,
+                "projection_available": projection_available,
                 "icu_pred_24h": icu24,
                 "icu_pred_48h": icu48,
                 "bed_pred_48h": bed48,
@@ -209,7 +239,7 @@ def _tier_weight(tier: str) -> int:
 
 
 async def _projection(facility_id: str) -> Optional[dict]:
-    """Forecast ICU + bed occupancy 48h ahead for one facility."""
+    """Forecast ICU + bed occupancy ahead for one facility."""
     rows = await Database.fetch(
         """
         SELECT reported_date AS ds,
@@ -226,16 +256,36 @@ async def _projection(facility_id: str) -> Optional[dict]:
         return None
     icu_df = pd.DataFrame([(r["ds"], r["icu"] or 0.0) for r in rows], columns=["ds", "y"])
     bed_df = pd.DataFrame([(r["ds"], r["bed"] or 0.0) for r in rows], columns=["ds", "y"])
+
+    # Compute ICU volatility (std dev of daily changes) for confidence.
+    icu_vals = [float(r["icu"] or 0.0) for r in rows]
+    volatility_icu = 0.0
+    if len(icu_vals) >= 2:
+        diffs = [abs(icu_vals[i] - icu_vals[i - 1]) for i in range(1, len(icu_vals))]
+        volatility_icu = float(np.std(diffs))
+
     try:
         forecaster = FacilityLoadForecaster(
             weekly_seasonality=True, yearly_seasonality=False
         )
-        proj = forecaster.fit_and_forecast(icu_df, bed_df, horizon_days=2)
+        proj = forecaster.fit_and_forecast(icu_df, bed_df)
+
+        # Extract 48h prediction interval bounds for tier-straddling check.
+        last_point = proj.series[-1] if proj.series else {}
+        icu_48h_lower = last_point.get("icu_lower")
+        icu_48h_upper = last_point.get("icu_upper")
+
         return {
             "trend": proj.trend,
+            "trend_confidence": proj.trend_confidence,
+            "projection_available": True,
+            "data_points": len(rows),
+            "volatility_icu": round(volatility_icu, 2),
             "icu_pred_24h": round(proj.icu_pred_24h, 2),
             "icu_pred_48h": round(proj.icu_pred_48h, 2),
             "bed_pred_48h": round(proj.bed_pred_48h, 2),
+            "icu_48h_lower": icu_48h_lower,
+            "icu_48h_upper": icu_48h_upper,
             "series": proj.series,
         }
     except Exception:  # noqa: BLE001

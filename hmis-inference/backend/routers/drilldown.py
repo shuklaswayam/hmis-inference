@@ -101,6 +101,8 @@ async def facility_drilldown(facility_id: UUID) -> dict:
         "z_scores": z_summary,
         "projected_48h": {
             "trend":    (proj or {}).get("trend"),
+            "trend_confidence": (proj or {}).get("trend_confidence", 0.0),
+            "projection_available": (proj or {}).get("projection_available", False),
             "icu_24h":  (proj or {}).get("icu_pred_24h"),
             "icu_48h":  (proj or {}).get("icu_pred_48h"),
             "bed_48h":  (proj or {}).get("bed_pred_48h"),

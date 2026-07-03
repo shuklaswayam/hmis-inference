@@ -7,6 +7,7 @@ import DrilldownPage from '@/pages/DrilldownPage'
 import LoginPage from '@/pages/LoginPage'
 import FacilitiesPage from '@/pages/FacilitiesPage'
 import AnalyticsPage from '@/pages/AnalyticsPage'
+import SettingsPage from '@/pages/SettingsPage'
 import { NotFoundPage } from '@/pages/placeholders'
 import { AuthProvider, useAuth } from '@/auth/AuthContext'
 import { I18nProvider } from '@/i18n'
@@ -38,7 +39,7 @@ export function AppRouter() {
               <Route path="ai" element={<Navigate to="/" replace />} />
               <Route path="investigations" element={<Navigate to="/" replace />} />
               <Route path="reports" element={<Navigate to="/" replace />} />
-              <Route path="settings" element={<Navigate to="/" replace />} />
+              <Route path="settings" element={<SettingsPage />} />
               <Route path="gantt" element={<Navigate to="/" replace />} />
               <Route path="*" element={<NotFoundPage />} />
            </Route>

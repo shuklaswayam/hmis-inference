@@ -21,7 +21,7 @@ from backend.llm.memo_synthesizer import (
     _scrub_action_text,
     _normalize_action,
     _neutral_surveillance_action,
-    _scrub_hashtags,
+    _scrub_body_noise,
 )
 from backend.inference import (
     cache as inference_cache,
@@ -202,8 +202,8 @@ async def compose(
     memo = synth.synthesize_memo(bundle)
 
     # Scrub again at the boundary -- belt and braces.
-    headline = _scrub_hashtags(memo.headline).strip()[:280]
-    body_md = _scrub_hashtags(memo.body_md).strip()[:8000]
+    headline = _scrub_body_noise(memo.headline).strip()[:280]
+    body_md = _scrub_body_noise(memo.body_md).strip()[:8000]
 
     raw_actions = list(memo.recommended_actions or [])
     if not raw_actions:

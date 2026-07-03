@@ -42,6 +42,8 @@ export interface PressureSignal {
   icu_occupancy_pct: number
   bed_occupancy_pct: number
   trend_48h: 'rising' | 'stable' | 'easing'
+  trend_confidence: number
+  projection_available: boolean
   icu_pred_24h: number | null
   icu_pred_48h: number | null
   bed_pred_48h: number | null
