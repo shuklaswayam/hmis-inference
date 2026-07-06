@@ -4,6 +4,7 @@
   "shell.nav.dashboard": "Dashboard",
   "shell.nav.facilities": "Facilities",
   "shell.nav.analytics": "Analytics",
+  "shell.nav.raw-data": "Raw Data",
   "shell.nav.audit": "Audit Log",
   "shell.nav.settings": "Settings",
   "shell.signin": "Sign in",

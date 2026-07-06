@@ -1,7 +1,8 @@
 from datetime import date
+from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
 
 from backend.database import Database
 from backend.inference.bulk_ingest import perform_bulk_ingest
@@ -171,3 +172,112 @@ async def ingest_csv(request: Request) -> dict:
             detail="CSV body exceeds 2MB cap — split the upload.",
         )
     return await perform_bulk_ingest(body)
+
+
+@router.get("/disease_reports", summary="List raw disease reports with filters")
+async def list_disease_reports(
+    facility_id: Optional[str] = Query(None),
+    disease_name: Optional[str] = Query(None),
+    district_id: Optional[str] = Query(None),
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+):
+    conditions = []
+    params: list = []
+    idx = 1
+
+    if facility_id:
+        conditions.append(f"dr.facility_id = ${idx}")
+        params.append(UUID(facility_id))
+        idx += 1
+    if disease_name:
+        conditions.append(f"dr.disease_name = ${idx}")
+        params.append(disease_name)
+        idx += 1
+    if district_id:
+        conditions.append(f"hf.district_id = ${idx}")
+        params.append(UUID(district_id))
+        idx += 1
+
+    where = "WHERE " + " AND ".join(conditions) if conditions else ""
+
+    count_q = f"""
+        SELECT COUNT(*) FROM disease_reports dr
+        JOIN health_facilities hf ON dr.facility_id = hf.id
+        {where}
+    """
+    total = await Database.fetchval(count_q, *params)
+
+    query = f"""
+        SELECT dr.id, dr.facility_id, hf.name AS facility_name, hf.district_id,
+               d.name AS district_name, dr.disease_name, dr.reported_date,
+               dr.case_count, dr.deaths, dr.age_group, dr.severity, dr.created_at
+        FROM disease_reports dr
+        JOIN health_facilities hf ON dr.facility_id = hf.id
+        JOIN districts d ON hf.district_id = d.id
+        {where}
+        ORDER BY dr.created_at DESC, dr.case_count DESC
+        LIMIT ${idx} OFFSET ${idx + 1}
+    """
+    params.extend([limit, offset])
+    rows = await Database.fetch(query, *params)
+
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "data": [dict(r) for r in rows],
+    }
+
+
+@router.get("/facility_metrics", summary="List raw facility metrics with filters")
+async def list_facility_metrics(
+    facility_id: Optional[str] = Query(None),
+    district_id: Optional[str] = Query(None),
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+):
+    conditions = []
+    params: list = []
+    idx = 1
+
+    if facility_id:
+        conditions.append(f"fm.facility_id = ${idx}")
+        params.append(UUID(facility_id))
+        idx += 1
+    if district_id:
+        conditions.append(f"hf.district_id = ${idx}")
+        params.append(UUID(district_id))
+        idx += 1
+
+    where = "WHERE " + " AND ".join(conditions) if conditions else ""
+
+    count_q = f"""
+        SELECT COUNT(*) FROM facility_metrics fm
+        JOIN health_facilities hf ON fm.facility_id = hf.id
+        {where}
+    """
+    total = await Database.fetchval(count_q, *params)
+
+    query = f"""
+        SELECT fm.id, fm.facility_id, hf.name AS facility_name, hf.district_id,
+               d.name AS district_name, fm.reported_date, fm.opd_visits,
+               fm.icu_occupancy_pct, fm.bed_occupancy_pct, fm.emergency_visits,
+               fm.maternal_deaths, fm.deliveries, fm.medicine_days_remaining,
+               fm.staff_attendance_pct, fm.created_at
+        FROM facility_metrics fm
+        JOIN health_facilities hf ON fm.facility_id = hf.id
+        JOIN districts d ON hf.district_id = d.id
+        {where}
+        ORDER BY fm.created_at DESC
+        LIMIT ${idx} OFFSET ${idx + 1}
+    """
+    params.extend([limit, offset])
+    rows = await Database.fetch(query, *params)
+
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "data": [dict(r) for r in rows],
+    }
