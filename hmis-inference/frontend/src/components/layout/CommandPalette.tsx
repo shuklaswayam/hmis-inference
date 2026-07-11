@@ -155,7 +155,6 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
         { label: 'Overview Dashboard', to: '/', icon: LayoutDashboard },
         { label: 'Facilities', to: '/facilities', icon: Activity },
         { label: 'Analytics', to: '/analytics', icon: Terminal },
-        { label: 'Raw Data', to: '/raw-data', icon: Download },
         { label: 'Audit Log', to: '/audit', icon: ShieldAlert },
         { label: 'Settings & Config', to: '/settings', icon: Settings },
       ]

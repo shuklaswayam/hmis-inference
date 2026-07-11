@@ -8,7 +8,6 @@ import LoginPage from '@/pages/LoginPage'
 import FacilitiesPage from '@/pages/FacilitiesPage'
 import AnalyticsPage from '@/pages/AnalyticsPage'
 import SettingsPage from '@/pages/SettingsPage'
-import RawDataPage from '@/pages/RawDataPage'
 import { NotFoundPage } from '@/pages/placeholders'
 import { AuthProvider, useAuth } from '@/auth/AuthContext'
 import { I18nProvider } from '@/i18n'
@@ -36,7 +35,6 @@ export function AppRouter() {
               <Route path="drilldown/:kind/:id/:disease" element={<DrilldownPage />} />
               <Route path="facilities" element={<FacilitiesPage />} />
               <Route path="analytics" element={<AnalyticsPage />} />
-              <Route path="raw-data" element={<RawDataPage />} />
               <Route path="alerts" element={<Navigate to="/" replace />} />
               <Route path="ai" element={<Navigate to="/" replace />} />
               <Route path="investigations" element={<Navigate to="/" replace />} />

@@ -17,7 +17,6 @@ import {
   X,
   MessageSquare,
   LogOut,
-  Database,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { CommandPalette } from '@/components/layout/CommandPalette'
@@ -71,7 +70,6 @@ export function AppShell() {
     { key: 'shell.nav.dashboard',  to: '/',           icon: LayoutDashboard },
     { key: 'shell.nav.facilities', to: '/facilities', icon: Activity       },
     { key: 'shell.nav.analytics',  to: '/analytics',  icon: Terminal       },
-    { key: 'shell.nav.raw-data',   to: '/raw-data',   icon: Database      },
     { key: 'shell.nav.audit',      to: '/audit',      icon: ShieldAlert    },
     { key: 'shell.nav.settings',   to: '/settings',   icon: Settings       },
   ]
