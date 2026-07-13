@@ -15,12 +15,10 @@ import {
   Info,
   HelpCircle,
   X,
-  MessageSquare,
   LogOut,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { CommandPalette } from '@/components/layout/CommandPalette'
-import { AIChat } from '@/components/AIChat'
 import { SSEToastHost } from '@/components/SSEToastHost'
 import { useAuth } from '@/auth/AuthContext'
 import { useI18n, LanguageSwitcher } from '@/i18n'
@@ -32,7 +30,6 @@ export function AppShell() {
   const [isSidebarHovered, setIsSidebarHovered] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
   const [inspectorOpen, setInspectorOpen] = useState(false)
-  const [aiChatOpen, setAiChatOpen] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [theme, setTheme] = useState<'light' | 'dark'>('dark')
 
@@ -249,20 +246,6 @@ export function AppShell() {
               {theme === 'dark' ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
             </button>
 
-            {/* AI Chat Toggle */}
-            <button
-              onClick={() => setAiChatOpen(!aiChatOpen)}
-              className={cn(
-                'h-7 w-7 rounded border flex items-center justify-center transition-all',
-                aiChatOpen
-                  ? 'border-accent/40 bg-accent/10 text-accent'
-                  : 'border-border/40 hover:bg-secondary/40 text-muted-foreground hover:text-foreground'
-              )}
-              aria-label="Toggle AI chat"
-            >
-              <MessageSquare className="h-3.5 w-3.5" />
-            </button>
-
             {/* Right Inspector Toggle */}
             <button
               onClick={() => setInspectorOpen(!inspectorOpen)}
@@ -381,18 +364,6 @@ export function AppShell() {
           </>
         )}
       </AnimatePresence>
-
-      {/* AI Chat Side Panel — 300px slide-in */}
-      <div
-        className={cn(
-          'fixed inset-y-0 right-0 z-50 w-[300px] flex flex-col border-l border-border/40 shadow-2xl',
-          'transition-transform duration-300 ease-in-out',
-          aiChatOpen ? 'translate-x-0' : 'translate-x-full'
-        )}
-        aria-label="AI Chat panel"
-      >
-        <AIChat onClose={() => setAiChatOpen(false)} />
-      </div>
 
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
     </div>
