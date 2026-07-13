@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils'
 import client from '@/api/client'
 
 type Confidence = 'low' | 'medium' | 'high'
-
+//sss
 interface AskResponse {
   question: string
   answer: string
@@ -99,7 +99,7 @@ export default function AIPage() {
           <Badge variant="accent" size="sm">
             <Sparkles className="h-3 w-3 mr-1" />
             Artem AI
-        </Badge>
+          </Badge>
         }
       />
 
@@ -109,7 +109,7 @@ export default function AIPage() {
             <Sparkles className="h-4 w-4 text-accent" />
             <h2 className="text-heading-sm font-semibold tracking-tight">Ask Artem</h2>
             <span className="text-caption text-muted-foreground">Policy-aware Q&A</span>
-        </div>
+          </div>
 
           <ScrollArea className="flex-1 h-[460px]">
             <div className="p-4 space-y-4">
@@ -119,8 +119,8 @@ export default function AIPage() {
                   <h3 className="text-subheading font-semibold text-foreground mb-2">Ask anything about health data</h3>
                   <p className="text-body-sm text-muted-foreground max-w-md mx-auto mb-6">
                     Artem uses policy documents, district metrics, and alert data to provide informed answers.
-                </p>
-                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-lg mx-auto">
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-lg mx-auto">
                     {suggestedQuestions.map((sq) => (
                       <button
                         key={sq}
@@ -128,10 +128,10 @@ export default function AIPage() {
                         className="text-left text-caption text-muted-foreground hover:text-foreground p-2.5 rounded-md border border-border/60 hover:border-accent/30 hover:bg-accent/5 transition-colors"
                       >
                         {sq}
-                    </button>
+                      </button>
                     ))}
+                  </div>
                 </div>
-              </div>
               )}
 
               {chatHistory.map((msg, i) => {
@@ -142,46 +142,46 @@ export default function AIPage() {
                     <div className="flex justify-end">
                       <div className="bg-accent/10 text-foreground rounded-lg px-4 py-2.5 max-w-[80%] text-body">
                         {msg.question}
+                      </div>
                     </div>
-                  </div>
                     {/* AI answer */}
                     <div className="flex gap-3">
                       <div className="h-7 w-7 rounded-md bg-accent/10 grid place-items-center shrink-0 mt-0.5">
                         <Sparkles className="h-3.5 w-3.5 text-accent" />
-                    </div>
+                      </div>
                       <div className="bg-secondary/60 rounded-lg px-4 py-3 max-w-[85%] space-y-3">
                         {structured ? (
                           <div className="space-y-3">
                             {msg.what_is_happening && (
                               <p className="text-body text-foreground/90 leading-relaxed whitespace-pre-wrap">
                                 {msg.what_is_happening}
-                            </p>
+                              </p>
                             )}
                             {msg.why_it_happening && (
                               <div className="border-l-2 border-border/60 pl-3 space-y-1">
                                 <p className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
                                   Why
-                              </p>
+                                </p>
                                 <p className="text-body-sm text-foreground/85 leading-relaxed whitespace-pre-wrap">
                                   {msg.why_it_happening}
-                              </p>
-                            </div>
+                                </p>
+                              </div>
                             )}
                             {msg.recommended_action && (
                               <div className="border-l-2 border-accent/60 pl-3 space-y-1">
                                 <p className="text-[10.5px] font-semibold uppercase tracking-wider text-accent">
                                   Recommended action
-                              </p>
+                                </p>
                                 <p className="text-body-sm text-foreground/85 leading-relaxed whitespace-pre-wrap">
                                   {msg.recommended_action}
-                              </p>
-                            </div>
+                                </p>
+                              </div>
                             )}
-                        </div>
+                          </div>
                         ) : (
                           <p className="text-body text-foreground/90 leading-relaxed whitespace-pre-wrap">
                             {msg.answer || 'No response generated.'}
-                        </p>
+                          </p>
                         )}
 
                         {/* Footer: status row (intent, confidence, refused) */}
@@ -193,12 +193,12 @@ export default function AIPage() {
                             {msg.confidence && (
                               <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border ${CONFIDENCE_BADGE[msg.confidence].className}`}>
                                 {CONFIDENCE_BADGE[msg.confidence].label}
-                            </span>
+                              </span>
                             )}
                             {msg.refused && (
                               <Badge variant="critical" size="sm">No answer</Badge>
                             )}
-                        </div>
+                          </div>
                         )}
 
                         {msg.sources.length > 0 && (
@@ -207,11 +207,11 @@ export default function AIPage() {
                             {msg.sources.map((s, j) => (
                               <span key={j} className="text-caption text-accent">{s}{j < msg.sources.length - 1 ? ', ' : ''}</span>
                             ))}
-                        </div>
+                          </div>
                         )}
+                      </div>
                     </div>
                   </div>
-                </div>
                 )
               })}
 
@@ -219,22 +219,22 @@ export default function AIPage() {
                 <div className="flex gap-3 animate-fade-in">
                   <div className="h-7 w-7 rounded-md bg-accent/10 grid place-items-center shrink-0">
                     <Loader2 className="h-3.5 w-3.5 text-accent animate-spin" />
-                </div>
+                  </div>
                   <div className="bg-secondary/60 rounded-lg px-4 py-3">
                     <p className="text-body-sm text-muted-foreground">Thinking…</p>
+                  </div>
                 </div>
-              </div>
               )}
 
               {askMutation.isError && (
                 <div className="rounded-lg bg-severity-critical/8 border border-severity-critical/20 px-4 py-3">
                   <p className="text-body-sm text-severity-critical">
                     Failed to get response. Is the backend running?
-                </p>
-              </div>
+                  </p>
+                </div>
               )}
-          </div>
-        </ScrollArea>
+            </div>
+          </ScrollArea>
 
           <form onSubmit={handleSubmit} className="border-t border-border/60 px-4 py-3">
             <div className="flex gap-2">
@@ -253,28 +253,28 @@ export default function AIPage() {
                 className="shrink-0"
               >
                 <Send className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        </form>
-      </Card>
+              </Button>
+            </div>
+          </form>
+        </Card>
 
         <div className="space-y-4">
           <Card className="overflow-hidden border-border/80">
             <div className="px-4 py-3 border-b border-border/60">
               <h3 className="text-subheading font-semibold tracking-tight">Recent AI Alerts</h3>
-          </div>
+            </div>
             <ScrollArea className="h-[280px]">
               {recentAlertsQuery.isLoading ? (
                 <div className="p-3 space-y-2">
                   {Array.from({ length: 3 }).map((_, i) => (
                     <Skeleton key={i} className="h-16 rounded-md" />
                   ))}
-              </div>
+                </div>
               ) : (recentAlertsQuery.data ?? []).length === 0 ? (
                 <div className="p-6 text-center">
                   <FileText className="h-6 w-6 text-muted-foreground/30 mx-auto mb-2" />
                   <p className="text-caption text-muted-foreground">No recent AI alerts</p>
-              </div>
+                </div>
               ) : (
                 <div className="p-2 space-y-1">
                   {(recentAlertsQuery.data ?? []).slice(0, 8).map((alert) => (
@@ -285,23 +285,23 @@ export default function AIPage() {
                           size="sm"
                         >
                           {alert.severity}
-                      </Badge>
+                        </Badge>
                         {alert.llm_generated && (
                           <Badge variant="accent" size="sm">AI</Badge>
                         )}
-                    </div>
+                      </div>
                       <p className="text-body-sm font-medium text-foreground truncate">
                         {alert.facility_name || 'Unknown'}
-                    </p>
+                      </p>
                       <p className="text-caption text-muted-foreground truncate">
                         {alert.district_name}
-                    </p>
-                  </div>
+                      </p>
+                    </div>
                   ))}
-            </div>
+                </div>
               )}
-          </ScrollArea>
-        </Card>
+            </ScrollArea>
+          </Card>
 
           <Card className="p-4 border-border/80">
             <h3 className="text-subheading font-semibold tracking-tight mb-3">Model Status</h3>
@@ -309,22 +309,22 @@ export default function AIPage() {
               <div className="flex items-center justify-between">
                 <span className="text-caption text-muted-foreground">Engine</span>
                 <span className="text-caption font-medium text-foreground">Artem LLM v1</span>
-            </div>
+              </div>
               <div className="flex items-center justify-between">
                 <span className="text-caption text-muted-foreground">RAG Source</span>
                 <span className="text-caption font-medium text-foreground">Policy Docs</span>
-            </div>
+              </div>
               <div className="flex items-center justify-between">
                 <span className="text-caption text-muted-foreground">Status</span>
                 <span className="flex items-center gap-1.5">
                   <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse-dot" />
                   <span className="text-caption font-medium text-success">Online</span>
-               </span>
+                </span>
+              </div>
             </div>
-          </div>
-        </Card>
+          </Card>
+        </div>
       </div>
-    </div>
-  </section>
+    </section>
   )
 }
